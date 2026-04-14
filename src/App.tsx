@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search } from 'lucide-react';
+import * as XLSX from 'xlsx';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download } from 'lucide-react';
 import { cn } from './lib/utils';
 
 const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
@@ -241,6 +242,13 @@ export default function App() {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
   };
 
+  const handleExportExcel = (data: any[], filename: string) => {
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Data");
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+  };
+
   const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -420,10 +428,19 @@ export default function App() {
                     {/* Thông tin 2: Thống kê chi tiết */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                       <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
-                        <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên</h3>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {tab1Data.details.length} bản ghi
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên</h3>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {tab1Data.details.length} bản ghi
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleExportExcel(tab1Data.details, `ChiTietTon_${selectedGroup}`)}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                        >
+                          <Download className="h-4 w-4" />
+                          Xuất Excel
+                        </button>
                       </div>
                       {renderDetailsTable(tab1Data.details, false)}
                     </div>
@@ -436,8 +453,15 @@ export default function App() {
             {activeTab === 'tab2' && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
+                  <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
                     <h3 className="text-lg font-medium leading-6 text-gray-900">Thống kê nợ của từng nhóm</h3>
+                    <button
+                      onClick={() => handleExportExcel([...tab2Data.groups, tab2Data.total], 'ThongKeTongHop')}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                    >
+                      <Download className="h-4 w-4" />
+                      Xuất Excel
+                    </button>
                   </div>
                   <div className="overflow-x-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -531,10 +555,19 @@ export default function App() {
                     {/* Thông tin 2: Thống kê chi tiết */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                       <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
-                        <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên (&ge; 5 triệu)</h3>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {tab3Data.details.length} bản ghi
-                        </span>
+                        <div className="flex items-center gap-3">
+                          <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên (&ge; 5 triệu)</h3>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                            {tab3Data.details.length} bản ghi
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleExportExcel(tab3Data.details, `KhachHangTren5Trieu_${selectedGroupTab3}`)}
+                          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                        >
+                          <Download className="h-4 w-4" />
+                          Xuất Excel
+                        </button>
                       </div>
                       {renderDetailsTable(tab3Data.details, selectedGroupTab3 === 'Công ty')}
                     </div>
