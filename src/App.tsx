@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare } from 'lucide-react';
 import { cn } from './lib/utils';
 
 const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
@@ -249,56 +249,97 @@ export default function App() {
     XLSX.writeFile(wb, `${filename}.xlsx`);
   };
 
-  const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => (
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">DANHSO</th>
-            {showGroupColumn && (
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
-            )}
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số Kỳ</th>
-            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
-            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">Địa Chỉ</th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {details.length === 0 ? (
+  const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => {
+    const getPhoneActions = (phoneStr: string) => {
+      if (!phoneStr) return null;
+      const match = phoneStr.match(/(?:\+84|0)[0-9]{8,9}/);
+      const phone = match ? match[0] : phoneStr.replace(/[^0-9+]/g, '');
+      if (!phone) return null;
+
+      return (
+        <div className="flex items-center gap-1 mt-2">
+          <a href={`tel:${phone}`} title="Gọi điện" className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
+            <Phone className="h-3.5 w-3.5" />
+          </a>
+          <a href={`sms:${phone}`} title="Nhắn tin SMS" className="p-1.5 text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors">
+            <MessageSquare className="h-3.5 w-3.5" />
+          </a>
+          <a href={`https://zalo.me/${phone.replace(/^\+84/, '0')}`} target="_blank" rel="noopener noreferrer" title="Chat Zalo" className="px-2 py-1 text-xs font-bold text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
+            Zalo
+          </a>
+        </div>
+      );
+    };
+
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
             <tr>
-              <td colSpan={showGroupColumn ? 11 : 10} className="px-6 py-8 text-center text-gray-500">
-                Không có dữ liệu tồn nợ cho nhóm này.
-              </td>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">DANHSO</th>
+              {showGroupColumn && (
+                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
+              )}
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số Kỳ</th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">Địa Chỉ</th>
             </tr>
-          ) : (
-            details.map((row, idx) => (
-              <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.DANHSO}</td>
-                {showGroupColumn && (
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
-                )}
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
-                <td className="px-6 py-4 text-sm text-gray-900">{row.TEN_KHANG}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.SO_KY}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.DTHOAI_DVU}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
-                <td className="px-6 py-4 text-sm text-gray-500">{row.DCHI_KHANG}</td>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {details.length === 0 ? (
+              <tr>
+                <td colSpan={showGroupColumn ? 11 : 10} className="px-6 py-8 text-center text-gray-500">
+                  Không có dữ liệu tồn nợ cho nhóm này.
+                </td>
               </tr>
-            ))
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
+            ) : (
+              details.map((row, idx) => (
+                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.DANHSO}</td>
+                  {showGroupColumn && (
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
+                  )}
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{row.TEN_KHANG}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.SO_KY}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div>{row.DTHOAI_DVU}</div>
+                    {getPhoneActions(row.DTHOAI_DVU)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    <div className="flex items-start justify-between gap-2">
+                      <span>{row.DCHI_KHANG}</span>
+                      {row.DCHI_KHANG && (
+                        <a 
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.DCHI_KHANG)}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          title="Chỉ đường trên Google Maps"
+                          className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors"
+                        >
+                          <MapPin className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
