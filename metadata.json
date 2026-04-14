@@ -1,0 +1,6 @@
+{
+  "name": "Thống Kê Tồn Nợ",
+  "description": "Ứng dụng thống kê tồn nợ từ Google Sheets, hiển thị chi tiết và tổng hợp theo nhóm quản lý.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
