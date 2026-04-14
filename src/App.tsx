@@ -26,9 +26,14 @@ export default function App() {
   const [chiaNhomData, setChiaNhomData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'tab1' | 'tab2' | 'tab3'>('tab1');
+  const [activeTab, setActiveTab] = useState<'tab1' | 'tab2' | 'tab3' | 'tab4'>('tab1');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedGroupTab3, setSelectedGroupTab3] = useState<string>('');
+  
+  // Tab 4 Search State
+  const [searchQueryInput, setSearchQueryInput] = useState('');
+  const [searchExactInput, setSearchExactInput] = useState(false);
+  const [searchParams, setSearchParams] = useState({ query: '', exact: false, hasSearched: false });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -159,6 +164,43 @@ export default function App() {
     };
   }, [selectedGroup, allAggregatedData]);
 
+  // Process data for Tab 4 (Search)
+  const searchResults = useMemo(() => {
+    if (!searchParams.hasSearched || !searchParams.query.trim()) return [];
+    
+    const query = searchParams.exact ? searchParams.query.trim() : searchParams.query.trim().toLowerCase();
+    
+    return tonData.filter(row => {
+      const ma = (row['MA_KHANG'] || '').toString();
+      const ten = (row['TEN_KHANG'] || '').toString();
+      const dchi = (row['DCHI_KHANG'] || '').toString();
+      
+      let matchMa = false;
+      let matchTen = false;
+      let matchDchi = false;
+
+      if (searchParams.exact) {
+        matchMa = ma === query;
+        matchTen = ten === query;
+        matchDchi = dchi === query;
+      } else {
+        matchMa = ma.toLowerCase().includes(query);
+        matchTen = ten.toLowerCase().includes(query);
+        matchDchi = dchi.toLowerCase().includes(query);
+      }
+
+      return matchMa || matchTen || matchDchi;
+    }).map((row, index) => ({
+      ...row,
+      STT: index + 1,
+      NHOM: khangToNhom.get(row['MA_KHANG']) || 'Không xác định',
+      THANG_HD: row['THANG'] || row['Thang'] || row['thang'] || '',
+      NAM_HD: row['NAM'] || row['Nam'] || row['nam'] || '',
+      KY_HD: row['KY'] || row['Ky'] || row['ky'] || '',
+      TONG_NO: parseFloat(row['TONG_NO'] || '0') || 0
+    }));
+  }, [tonData, searchParams, khangToNhom]);
+
   // Process data for Tab 3 (>= 5M)
   const tab3Data = useMemo(() => {
     if (!selectedGroupTab3) return null;
@@ -249,28 +291,97 @@ export default function App() {
     XLSX.writeFile(wb, `${filename}.xlsx`);
   };
 
+  const getPhoneActions = (phoneStr: string) => {
+    if (!phoneStr) return null;
+    const match = phoneStr.match(/(?:\+84|0)[0-9]{8,9}/);
+    const phone = match ? match[0] : phoneStr.replace(/[^0-9+]/g, '');
+    if (!phone) return null;
+
+    return (
+      <div className="flex items-center gap-1 mt-2">
+        <a href={`tel:${phone}`} title="Gọi điện" className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
+          <Phone className="h-3.5 w-3.5" />
+        </a>
+        <a href={`sms:${phone}`} title="Nhắn tin SMS" className="p-1.5 text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors">
+          <MessageSquare className="h-3.5 w-3.5" />
+        </a>
+        <a href={`https://zalo.me/${phone.replace(/^\+84/, '0')}`} target="_blank" rel="noopener noreferrer" title="Chat Zalo" className="px-2 py-1 text-xs font-bold text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
+          Zalo
+        </a>
+      </div>
+    );
+  };
+
+  const renderSearchTable = (details: any[]) => {
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Kỳ HĐ</th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tháng HĐ</th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Năm HĐ</th>
+              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
+              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">Địa Chỉ</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {details.length === 0 ? (
+              <tr>
+                <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
+                  Không tìm thấy dữ liệu phù hợp.
+                </td>
+              </tr>
+            ) : (
+              details.map((row, idx) => (
+                <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{row.TEN_KHANG}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.KY_HD}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.THANG_HD}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.NAM_HD}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <div>{row.DTHOAI_DVU}</div>
+                    {getPhoneActions(row.DTHOAI_DVU)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    <div className="flex items-start justify-between gap-2">
+                      <span>{row.DCHI_KHANG}</span>
+                      {row.DCHI_KHANG && (
+                        <a 
+                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.DCHI_KHANG)}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          title="Chỉ đường trên Google Maps"
+                          className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors"
+                        >
+                          <MapPin className="h-4 w-4" />
+                        </a>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    );
+  };
+
   const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => {
-    const getPhoneActions = (phoneStr: string) => {
-      if (!phoneStr) return null;
-      const match = phoneStr.match(/(?:\+84|0)[0-9]{8,9}/);
-      const phone = match ? match[0] : phoneStr.replace(/[^0-9+]/g, '');
-      if (!phone) return null;
-
-      return (
-        <div className="flex items-center gap-1 mt-2">
-          <a href={`tel:${phone}`} title="Gọi điện" className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
-            <Phone className="h-3.5 w-3.5" />
-          </a>
-          <a href={`sms:${phone}`} title="Nhắn tin SMS" className="p-1.5 text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors">
-            <MessageSquare className="h-3.5 w-3.5" />
-          </a>
-          <a href={`https://zalo.me/${phone.replace(/^\+84/, '0')}`} target="_blank" rel="noopener noreferrer" title="Chat Zalo" className="px-2 py-1 text-xs font-bold text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
-            Zalo
-          </a>
-        </div>
-      );
-    };
-
     return (
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -343,12 +454,17 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
+      <header className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 shadow-lg border-b border-blue-950 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center gap-2">
-              <FileSpreadsheet className="h-6 w-6 text-blue-600" />
-              <h1 className="text-xl font-semibold text-gray-900">Thống Kê Tồn Nợ</h1>
+          <div className="flex justify-between items-center h-20">
+            <div className="flex items-center gap-4">
+              <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 shadow-inner">
+                <FileSpreadsheet className="h-7 w-7 text-blue-100" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold text-white tracking-tight">Hệ Thống Quản Lý Tồn Nợ</h1>
+                <p className="text-blue-200 text-sm font-medium mt-0.5">Theo dõi và thống kê chi tiết công nợ khách hàng</p>
+              </div>
             </div>
           </div>
         </div>
@@ -408,6 +524,17 @@ export default function App() {
                   )}
                 >
                   Tab 3: Khách hàng từ 5 triệu
+                </button>
+                <button
+                  onClick={() => setActiveTab('tab4')}
+                  className={cn(
+                    "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                    activeTab === 'tab4'
+                      ? "border-blue-600 text-blue-600"
+                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                  )}
+                >
+                  Tab 4: Tìm kiếm
                 </button>
               </nav>
             </div>
@@ -535,6 +662,76 @@ export default function App() {
                     </table>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {/* Tab 4 Content */}
+            {activeTab === 'tab4' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+                  <form 
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      setSearchParams({
+                        query: searchQueryInput,
+                        exact: searchExactInput,
+                        hasSearched: true
+                      });
+                    }}
+                    className="flex flex-col md:flex-row gap-4 items-end"
+                  >
+                    <div className="flex-1 w-full">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Từ khóa tìm kiếm</label>
+                      <input
+                        type="text"
+                        value={searchQueryInput}
+                        onChange={(e) => setSearchQueryInput(e.target.value)}
+                        placeholder="Nhập mã, tên hoặc địa chỉ..."
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                      />
+                    </div>
+                    <div className="w-full md:w-48">
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Kiểu tìm kiếm</label>
+                      <select
+                        value={searchExactInput ? 'exact' : 'partial'}
+                        onChange={(e) => setSearchExactInput(e.target.value === 'exact')}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                      >
+                        <option value="partial">Tìm gần đúng</option>
+                        <option value="exact">Tìm chính xác</option>
+                      </select>
+                    </div>
+                    <button
+                      type="submit"
+                      className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 h-[42px]"
+                    >
+                      <Search className="h-4 w-4" />
+                      Tìm kiếm
+                    </button>
+                  </form>
+                </div>
+
+                {searchParams.hasSearched && (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-medium leading-6 text-gray-900">Kết quả tìm kiếm</h3>
+                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {searchResults.length} bản ghi
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => handleExportExcel(searchResults, `TimKiem_${searchParams.query}`)}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                        disabled={searchResults.length === 0}
+                      >
+                        <Download className="h-4 w-4" />
+                        Xuất Excel
+                      </button>
+                    </div>
+                    {renderSearchTable(searchResults)}
+                  </div>
+                )}
               </div>
             )}
 
