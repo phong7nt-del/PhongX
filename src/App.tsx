@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X } from 'lucide-react';
 import { cn } from './lib/utils';
 
 const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
@@ -34,6 +34,13 @@ export default function App() {
   const [searchQueryInput, setSearchQueryInput] = useState('');
   const [searchExactInput, setSearchExactInput] = useState(false);
   const [searchParams, setSearchParams] = useState({ query: '', exact: false, hasSearched: false });
+  
+  // Phone Update State
+  const [updatedPhones, setUpdatedPhones] = useState<Record<string, string>>({});
+  const [phoneUpdateLog, setPhoneUpdateLog] = useState<any[]>([]);
+  const [editingPhone, setEditingPhone] = useState<{ maKhang: string, currentPhone: string } | null>(null);
+  const [newPhoneInput, setNewPhoneInput] = useState('');
+  const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -153,12 +160,14 @@ export default function App() {
     });
 
     const hdTon = groupData.reduce((sum, item) => sum + item.HD_TON, 0);
+    const tongNo = groupData.reduce((sum, item) => sum + item.TONG_NO, 0);
 
     return {
       summary: {
         NHOM: selectedGroup,
         KH_TON: groupData.length,
         HD_TON: hdTon,
+        TONG_NO: tongNo,
       },
       details: detailedList
     };
@@ -228,12 +237,14 @@ export default function App() {
     });
 
     const hdTon = filteredData.reduce((sum, item) => sum + item.HD_TON, 0);
+    const tongNo = filteredData.reduce((sum, item) => sum + item.TONG_NO, 0);
 
     return {
       summary: {
         NHOM: selectedGroupTab3,
         KH_TON: filteredData.length,
         HD_TON: hdTon,
+        TONG_NO: tongNo,
       },
       details: detailedList
     };
@@ -289,6 +300,69 @@ export default function App() {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Data");
     XLSX.writeFile(wb, `${filename}.xlsx`);
+  };
+
+  const handleUpdatePhone = async (row: any) => {
+    if (!newPhoneInput.trim() || isUpdatingPhone) return;
+    
+    const newPhone = newPhoneInput.trim();
+    const currentPhone = row.DTHOAI_DVU || '';
+    
+    setIsUpdatingPhone(true);
+    
+    try {
+      const today = new Date();
+      const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+      
+      const payload = {
+        nhom: row.NHOM || '',
+        maKhang: row.MA_KHANG || '',
+        tenKhang: row.TEN_KHANG || '',
+        diaChi: row.DCHI_KHANG || '',
+        sdtCu: currentPhone,
+        sdtMoi: newPhone,
+        thoiGian: formattedDate
+      };
+
+      // Call Google Apps Script Web App
+      await fetch('https://script.google.com/macros/s/AKfycbxPNRJ24wCy7dgrSQ21E3_ZZTNzW8GvfHoA1_qH13qkVNV3IVOy7FPUmb0O0rj6MbGm/exec', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // Update local state
+      setUpdatedPhones(prev => ({
+        ...prev,
+        [row.MA_KHANG]: newPhone
+      }));
+      
+      // Add to log
+      setPhoneUpdateLog(prev => [
+        ...prev,
+        {
+          STT: prev.length + 1,
+          NHOM: row.NHOM,
+          MA_KHANG: row.MA_KHANG,
+          TEN_KHANG: row.TEN_KHANG,
+          DCHI_KHANG: row.DCHI_KHANG,
+          DTHOAI_CU: currentPhone,
+          DTHOAI_MOI: newPhone,
+          THOI_GIAN: formattedDate
+        }
+      ]);
+      
+      setEditingPhone(null);
+      setNewPhoneInput('');
+    } catch (error) {
+      console.error('Error updating phone:', error);
+      alert('Có lỗi xảy ra khi cập nhật số điện thoại. Vui lòng thử lại!');
+    } finally {
+      setIsUpdatingPhone(false);
+    }
   };
 
   const getPhoneActions = (phoneStr: string) => {
@@ -351,8 +425,45 @@ export default function App() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.NAM_HD}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div>{row.DTHOAI_DVU}</div>
-                    {getPhoneActions(row.DTHOAI_DVU)}
+                    {editingPhone?.maKhang === row.MA_KHANG ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newPhoneInput}
+                          onChange={(e) => setNewPhoneInput(e.target.value)}
+                          className="w-32 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Nhập SĐT mới"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleUpdatePhone(row);
+                            if (e.key === 'Escape') setEditingPhone(null);
+                          }}
+                        />
+                        <button onClick={() => handleUpdatePhone(row)} className="p-1 text-green-600 hover:bg-green-50 rounded">
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => setEditingPhone(null)} className="p-1 text-red-600 hover:bg-red-50 rounded">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="group flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU}</div>
+                          {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
+                            setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+                          title="Cập nhật số điện thoại"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
@@ -422,8 +533,45 @@ export default function App() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.SO_KY}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    <div>{row.DTHOAI_DVU}</div>
-                    {getPhoneActions(row.DTHOAI_DVU)}
+                    {editingPhone?.maKhang === row.MA_KHANG ? (
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={newPhoneInput}
+                          onChange={(e) => setNewPhoneInput(e.target.value)}
+                          className="w-32 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          placeholder="Nhập SĐT mới"
+                          autoFocus
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') handleUpdatePhone(row);
+                            if (e.key === 'Escape') setEditingPhone(null);
+                          }}
+                        />
+                        <button onClick={() => handleUpdatePhone(row)} className="p-1 text-green-600 hover:bg-green-50 rounded">
+                          <Check className="h-4 w-4" />
+                        </button>
+                        <button onClick={() => setEditingPhone(null)} className="p-1 text-red-600 hover:bg-red-50 rounded">
+                          <X className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="group flex items-center justify-between">
+                        <div>
+                          <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU}</div>
+                          {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
+                        </div>
+                        <button 
+                          onClick={() => {
+                            setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
+                            setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
+                          }}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+                          title="Cập nhật số điện thoại"
+                        >
+                          <Edit2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
@@ -454,17 +602,24 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      <header className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 shadow-lg border-b border-blue-950 sticky top-0 z-10">
+      <header className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 shadow-lg border-b border-blue-950 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center gap-4">
-              <div className="p-2.5 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 shadow-inner">
-                <FileSpreadsheet className="h-7 w-7 text-blue-100" />
+              <div className="bg-white p-1.5 rounded-lg shadow-sm">
+                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Logo_EVN.svg/512px-Logo_EVN.svg.png" alt="EVN Logo" className="h-10 object-contain" onError={(e) => {
+                  // Fallback if image fails to load
+                  (e.target as HTMLImageElement).src = "https://evnhcmc.vn/images/logo.png";
+                }} />
               </div>
               <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight">Hệ Thống Quản Lý Tồn Nợ</h1>
-                <p className="text-blue-200 text-sm font-medium mt-0.5">Theo dõi và thống kê chi tiết công nợ khách hàng</p>
+                <h1 className="text-2xl font-bold text-white tracking-tight drop-shadow-sm">Hệ Thống Quản Lý Tồn Nợ</h1>
+                <p className="text-blue-200 text-sm font-medium mt-0.5">Công ty Điện lực Vũng Tàu</p>
               </div>
+            </div>
+            <div className="hidden md:block text-right">
+              <div className="text-blue-100 font-medium text-sm">Nguyễn Thành Phong - Đội QLTG</div>
+              <div className="text-blue-300 text-xs mt-0.5 font-mono">Version: 2026.4.1</div>
             </div>
           </div>
         </div>
@@ -490,54 +645,80 @@ export default function App() {
         ) : (
           <div className="space-y-6">
             {/* Tabs */}
-            <div className="border-b border-gray-200 overflow-x-auto">
-              <nav className="-mb-px flex space-x-8 min-w-max" aria-label="Tabs">
+            <div className="pb-2 overflow-x-auto">
+              <nav className="flex space-x-4 min-w-max px-1 pt-1" aria-label="Tabs">
                 <button
                   onClick={() => setActiveTab('tab1')}
                   className={cn(
-                    "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                    "flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 border-b-4",
                     activeTab === 'tab1'
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      ? "bg-gradient-to-br from-blue-500 to-blue-600 text-white border-blue-700 shadow-md transform translate-y-0"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-blue-600 shadow-sm"
                   )}
                 >
+                  <Users className={cn("h-5 w-5", activeTab === 'tab1' ? "text-blue-100" : "text-blue-500")} />
                   Tab 1: Chi tiết theo nhóm
                 </button>
                 <button
                   onClick={() => setActiveTab('tab2')}
                   className={cn(
-                    "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                    "flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 border-b-4",
                     activeTab === 'tab2'
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      ? "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white border-emerald-700 shadow-md transform translate-y-0"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-emerald-600 shadow-sm"
                   )}
                 >
+                  <BarChart3 className={cn("h-5 w-5", activeTab === 'tab2' ? "text-emerald-100" : "text-emerald-500")} />
                   Tab 2: Thống kê tổng hợp
                 </button>
                 <button
                   onClick={() => setActiveTab('tab3')}
                   className={cn(
-                    "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                    "flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 border-b-4",
                     activeTab === 'tab3'
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      ? "bg-gradient-to-br from-purple-500 to-purple-600 text-white border-purple-700 shadow-md transform translate-y-0"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-purple-600 shadow-sm"
                   )}
                 >
-                  Tab 3: Khách hàng từ 5 triệu
+                  <Star className={cn("h-5 w-5", activeTab === 'tab3' ? "text-purple-100" : "text-purple-500")} />
+                  Tab 3: Khách hàng &ge; 5 triệu
                 </button>
                 <button
                   onClick={() => setActiveTab('tab4')}
                   className={cn(
-                    "whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm transition-colors",
+                    "flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 border-b-4",
                     activeTab === 'tab4'
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                      ? "bg-gradient-to-br from-orange-500 to-orange-600 text-white border-orange-700 shadow-md transform translate-y-0"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-orange-600 shadow-sm"
                   )}
                 >
+                  <Search className={cn("h-5 w-5", activeTab === 'tab4' ? "text-orange-100" : "text-orange-500")} />
                   Tab 4: Tìm kiếm
                 </button>
               </nav>
             </div>
+            
+            {/* Phone Update Export Button (Global) */}
+            {phoneUpdateLog.length > 0 && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-center justify-between shadow-sm animate-in fade-in slide-in-from-top-4">
+                <div className="flex items-center gap-3">
+                  <div className="bg-amber-100 p-2 rounded-full">
+                    <Phone className="h-5 w-5 text-amber-600" />
+                  </div>
+                  <div>
+                    <h4 className="text-amber-900 font-medium">Đã cập nhật {phoneUpdateLog.length} số điện thoại</h4>
+                    <p className="text-amber-700 text-sm">Xuất file Excel để cập nhật vào sheet CapNhatSDT</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleExportExcel(phoneUpdateLog, `CapNhatSDT_${new Date().getTime()}`)}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-sm font-medium rounded-lg shadow-sm transition-colors flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  Xuất danh sách cập nhật
+                </button>
+              </div>
+            )}
 
             {/* Tab 1 Content */}
             {activeTab === 'tab1' && (
@@ -571,23 +752,29 @@ export default function App() {
                       <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
                         <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn</h3>
                       </div>
-                      <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-6">
+                      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                           <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
                           <dd className="mt-2 text-2xl font-semibold text-blue-900">{tab1Data.summary.NHOM}</dd>
                         </div>
                         <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                          <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn (KH_Ton)</dt>
+                          <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
                           <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
                             <Users className="h-5 w-5 opacity-70" />
                             {tab1Data.summary.KH_TON}
                           </dd>
                         </div>
                         <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-                          <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn (HD_Ton)</dt>
+                          <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
                           <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
                             <Receipt className="h-5 w-5 opacity-70" />
                             {tab1Data.summary.HD_TON}
+                          </dd>
+                        </div>
+                        <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                          <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
+                          <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
+                            {formatCurrency(tab1Data.summary.TONG_NO)}
                           </dd>
                         </div>
                       </div>
@@ -768,23 +955,29 @@ export default function App() {
                       <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
                         <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn (&ge; 5 triệu)</h3>
                       </div>
-                      <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-6">
+                      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                           <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
                           <dd className="mt-2 text-2xl font-semibold text-blue-900">{tab3Data.summary.NHOM}</dd>
                         </div>
                         <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                          <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn (KH_Ton)</dt>
+                          <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
                           <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
                             <Users className="h-5 w-5 opacity-70" />
                             {tab3Data.summary.KH_TON}
                           </dd>
                         </div>
                         <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-                          <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn (HD_Ton)</dt>
+                          <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
                           <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
                             <Receipt className="h-5 w-5 opacity-70" />
                             {tab3Data.summary.HD_TON}
+                          </dd>
+                        </div>
+                        <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                          <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
+                          <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
+                            {formatCurrency(tab3Data.summary.TONG_NO)}
                           </dd>
                         </div>
                       </div>
