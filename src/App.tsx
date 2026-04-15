@@ -32,6 +32,7 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'tab1' | 'tab2' | 'tab3' | 'tab4' | 'tab5'>('tab1');
   const [activeTab2SubTab, setActiveTab2SubTab] = useState<'nhom' | 'phien'>('nhom');
+  const [activeTab3SubTab, setActiveTab3SubTab] = useState<'lonHon5M' | 'noKhoDoi'>('lonHon5M');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedGroupTab3, setSelectedGroupTab3] = useState<string>('');
   const [activeRegionTab, setActiveRegionTab] = useState<string>('Vũng Tàu');
@@ -154,7 +155,8 @@ export default function App() {
       DCHI_KHANG: row['ĐỊA CHỈ'] || row['DIA_CHI'] || row['DCHI_KHANG'] || '',
       DTHOAI_CU: row['DTHOAI_DVU CU'] || row['ĐIỆN THOẠI CŨ'] || row['SDT_CU'] || row['DTHOAI_CU'] || '',
       DTHOAI_MOI: row['DTHOAI_DVU MOI'] || row['ĐIỆN THOẠI MỚI'] || row['SDT_MOI'] || row['DTHOAI_MOI'] || '',
-      THOI_GIAN: row['TGIAN_CAPNHAT'] || row['THỜI GIAN CẬP NHẬT'] || row['THOI_GIAN'] || row['NGÀY'] || ''
+      THOI_GIAN: row['TGIAN_CAPNHAT'] || row['THỜI GIAN CẬP NHẬT'] || row['THOI_GIAN'] || row['NGÀY'] || '',
+      TRANG_THAI: row['TRẠNG THÁI'] || row['TRANG_THAI'] || row['Trạng thái'] || row['Trạng Thái'] || ''
     })).filter(row => row.MA_KHANG);
 
     const fetchedMaKhangs = new Set(fetchedUpdates.map(u => u.MA_KHANG));
@@ -165,6 +167,11 @@ export default function App() {
       TRANG_THAI: statusUpdates[u.MA_KHANG] || u.TRANG_THAI || 'Mới đề nghị'
     }));
   }, [capNhatSdtData, phoneUpdateLog, statusUpdates]);
+
+  // Get count of pending updates for the badge
+  const pendingUpdatesCount = useMemo(() => {
+    return allUpdates.filter(u => u.TRANG_THAI === 'Mới đề nghị').length;
+  }, [allUpdates]);
 
   // Group updates by Region
   const updatesByRegion = useMemo(() => {
@@ -193,19 +200,35 @@ export default function App() {
   const allAggregatedData = useMemo(() => {
     const aggregated = new Map<string, any>();
     
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonth = currentDate.getMonth() + 1; // 1-12
+
     tonData.forEach(row => {
       const maKhang = row['MA_KHANG'];
       const tongNo = parseFloat(row['TONG_NO'] || '0') || 0;
       const nhom = khangToNhom.get(maKhang) || 'Không xác định';
+      
+      const nam = parseInt(row['NAM'] || row['Nam'] || row['nam'] || '0', 10);
+      const thang = parseInt(row['THANG'] || row['Thang'] || row['thang'] || '0', 10);
+      let isOldDebt = false;
+      if (nam > 0 && thang > 0) {
+        const monthsDiff = (currentYear - nam) * 12 + (currentMonth - thang);
+        if (monthsDiff >= 6) {
+          isOldDebt = true;
+        }
+      }
       
       if (aggregated.has(maKhang)) {
         const existing = aggregated.get(maKhang);
         existing.SO_KY += 1;
         existing.TONG_NO += tongNo;
         existing.HD_TON += 1;
+        if (isOldDebt) existing.hasOldDebt = true;
       } else {
         aggregated.set(maKhang, {
           MA_KVUC: row['MA_KVUC'] || '',
+          STT_TON: row['STT'] || '',
           NHOM: nhom,
           MA_KHANG: maKhang,
           TEN_KHANG: row['TEN_KHANG'] || '',
@@ -216,6 +239,7 @@ export default function App() {
           MA_SOGCS: row['MA_SOGCS'] || '',
           SO_TBI: row['SO_TBI'] || '',
           DCHI_KHANG: row['DCHI_KHANG'] || '',
+          hasOldDebt: isOldDebt
         });
       }
     });
@@ -239,7 +263,7 @@ export default function App() {
       const stt = index + 1;
       return {
         STT: stt,
-        DANHSO: `${item.MA_KVUC}${stt}`,
+        DOANHSO: `${item.MA_KVUC} - ${item.STT_TON}`,
         ...item
       };
     });
@@ -316,7 +340,47 @@ export default function App() {
       const stt = index + 1;
       return {
         STT: stt,
-        DANHSO: `${item.MA_KVUC}${stt}`,
+        DOANHSO: `${item.MA_KVUC} - ${item.STT_TON}`,
+        ...item
+      };
+    });
+
+    const hdTon = filteredData.reduce((sum, item) => sum + item.HD_TON, 0);
+    const tongNo = filteredData.reduce((sum, item) => sum + item.TONG_NO, 0);
+
+    return {
+      summary: {
+        NHOM: selectedGroupTab3,
+        KH_TON: filteredData.length,
+        HD_TON: hdTon,
+        TONG_NO: tongNo,
+      },
+      details: detailedList
+    };
+  }, [selectedGroupTab3, allAggregatedData]);
+
+  // Process data for Tab 3 (Nợ khó đòi >= 6 months)
+  const tab3NoKhoDoiData = useMemo(() => {
+    if (!selectedGroupTab3) return null;
+
+    let filteredData = allAggregatedData.filter(item => item.hasOldDebt);
+
+    if (selectedGroupTab3 !== 'Công ty') {
+      filteredData = filteredData.filter(item => item.NHOM === selectedGroupTab3);
+    }
+
+    const sortedData = [...filteredData].sort((a, b) => {
+      if (a.SO_KY !== b.SO_KY) {
+        return b.SO_KY - a.SO_KY;
+      }
+      return b.TONG_NO - a.TONG_NO;
+    });
+
+    const detailedList = sortedData.map((item, index) => {
+      const stt = index + 1;
+      return {
+        STT: stt,
+        DOANHSO: `${item.MA_KVUC} - ${item.STT_TON}`,
         ...item
       };
     });
@@ -814,7 +878,7 @@ export default function App() {
               </div>
               
               <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg">
-                <div><span className="text-gray-400">Danh bộ:</span> {row.DANHSO}</div>
+                <div><span className="text-gray-400">Doanh số:</span> {row.DOANHSO}</div>
                 <div><span className="text-gray-400">Sổ GCS:</span> {row.MA_SOGCS}</div>
                 <div className="col-span-2"><span className="text-gray-400">Số TBI:</span> {row.SO_TBI}</div>
               </div>
@@ -871,7 +935,7 @@ export default function App() {
             <thead className="bg-gray-50">
               <tr>
                 <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">DANHSO</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Doanh số</th>
                 {showGroupColumn && (
                   <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
                 )}
@@ -889,7 +953,7 @@ export default function App() {
               {details.map((row, idx) => (
                 <tr key={idx} className="hover:bg-gray-50 transition-colors">
                   <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{row.DANHSO}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{row.DOANHSO}</td>
                   {showGroupColumn && (
                     <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
                   )}
@@ -1046,7 +1110,7 @@ export default function App() {
                   )}
                 >
                   <Star className={cn("h-5 w-5", activeTab === 'tab3' ? "text-purple-100" : "text-purple-500")} />
-                  Tab 3: Khách hàng &ge; 5 triệu
+                  Tab 3: Khách hàng cần quan tâm
                 </button>
                 <button
                   onClick={() => setActiveTab('tab4')}
@@ -1071,9 +1135,9 @@ export default function App() {
                 >
                   <div className="relative">
                     <ClipboardList className={cn("h-5 w-5", activeTab === 'tab5' ? "text-pink-100" : "text-pink-500")} />
-                    {allUpdates.length > 0 && (
+                    {pendingUpdatesCount > 0 && (
                       <span className="absolute -top-2 -right-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">
-                        {allUpdates.length}
+                        {pendingUpdatesCount}
                       </span>
                     )}
                   </div>
@@ -1394,8 +1458,33 @@ export default function App() {
             {activeTab === 'tab3' && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                  <div className="flex space-x-1 bg-gray-200 p-1 rounded-lg mb-6 w-fit">
+                    <button
+                      onClick={() => setActiveTab3SubTab('lonHon5M')}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                        activeTab3SubTab === 'lonHon5M'
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      )}
+                    >
+                      Khách hàng lớn hơn 5 triệu
+                    </button>
+                    <button
+                      onClick={() => setActiveTab3SubTab('noKhoDoi')}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                        activeTab3SubTab === 'noKhoDoi'
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      )}
+                    >
+                      Khách hàng nợ khó đòi
+                    </button>
+                  </div>
+
                   <label htmlFor="group-select-tab3" className="block text-sm font-medium text-gray-700 mb-2">
-                    Chọn nhóm quản lý (Khách hàng nợ &ge; 5 triệu)
+                    Chọn nhóm quản lý ({activeTab3SubTab === 'lonHon5M' ? 'Khách hàng nợ ≥ 5 triệu' : 'Khách hàng nợ khó đòi'})
                   </label>
                   <div className="relative max-w-md">
                     <select
@@ -1416,36 +1505,36 @@ export default function App() {
                   </div>
                 </div>
 
-                {selectedGroupTab3 && tab3Data && (
+                {selectedGroupTab3 && (activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData) && (
                   <div className="space-y-6">
                     {/* Thông tin 1: Tổng quát tồn */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                       <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
-                        <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn (&ge; 5 triệu)</h3>
+                        <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn ({activeTab3SubTab === 'lonHon5M' ? '≥ 5 triệu' : 'Nợ khó đòi'})</h3>
                       </div>
                       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                           <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
-                          <dd className="mt-2 text-2xl font-semibold text-blue-900">{tab3Data.summary.NHOM}</dd>
+                          <dd className="mt-2 text-2xl font-semibold text-blue-900">{(activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.summary.NHOM}</dd>
                         </div>
                         <div className="bg-green-50 rounded-lg p-4 border border-green-100">
                           <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
                           <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
                             <Users className="h-5 w-5 opacity-70" />
-                            {tab3Data.summary.KH_TON}
+                            {(activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.summary.KH_TON}
                           </dd>
                         </div>
                         <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
                           <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
                           <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
                             <Receipt className="h-5 w-5 opacity-70" />
-                            {tab3Data.summary.HD_TON}
+                            {(activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.summary.HD_TON}
                           </dd>
                         </div>
                         <div className="bg-red-50 rounded-lg p-4 border border-red-100">
                           <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
                           <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
-                            {formatCurrency(tab3Data.summary.TONG_NO)}
+                            {formatCurrency((activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.summary.TONG_NO)}
                           </dd>
                         </div>
                       </div>
@@ -1455,20 +1544,20 @@ export default function App() {
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                       <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                          <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên (&ge; 5 triệu)</h3>
+                          <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên ({activeTab3SubTab === 'lonHon5M' ? '≥ 5 triệu' : 'Nợ khó đòi'})</h3>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {tab3Data.details.length} bản ghi
+                            {(activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.details.length} bản ghi
                           </span>
                         </div>
                         <button
-                          onClick={() => handleExportExcel(tab3Data.details, `KhachHangTren5Trieu_${selectedGroupTab3}`)}
+                          onClick={() => handleExportExcel((activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.details, activeTab3SubTab === 'lonHon5M' ? `KhachHangTren5Trieu_${selectedGroupTab3}` : `KhachHangNoKhoDoi_${selectedGroupTab3}`)}
                           className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
                         >
                           <Download className="h-4 w-4" />
                           Xuất Excel
                         </button>
                       </div>
-                      {renderDetailsTable(tab3Data.details, selectedGroupTab3 === 'Công ty')}
+                      {renderDetailsTable((activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.details, selectedGroupTab3 === 'Công ty')}
                     </div>
                   </div>
                 )}
