@@ -504,52 +504,122 @@ export default function App() {
   };
 
   const renderSearchTable = (details: any[]) => {
+    if (details.length === 0) {
+      return (
+        <div className="p-8 text-center text-gray-500 bg-white rounded-lg border border-gray-200">
+          Không tìm thấy dữ liệu phù hợp.
+        </div>
+      );
+    }
+
     return (
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Kỳ HĐ</th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tháng HĐ</th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Năm HĐ</th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">Địa Chỉ</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {details.length === 0 ? (
+      <div className="space-y-4">
+        {/* Mobile Card View */}
+        <div className="block md:hidden space-y-4">
+          {details.map((row, idx) => (
+            <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">STT: {row.STT} • Nhóm: {row.NHOM}</div>
+                  <div className="font-bold text-blue-600 text-lg">{row.MA_KHANG}</div>
+                  <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-red-600 text-lg">{formatCurrency(row.TONG_NO)}</div>
+                  <div className="text-sm text-gray-500">Kỳ: {row.KY_HD}/{row.THANG_HD}/{row.NAM_HD}</div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg">
+                <div><span className="text-gray-400">Sổ GCS:</span> {row.MA_SOGCS}</div>
+                <div><span className="text-gray-400">Số TBI:</span> {row.SO_TBI}</div>
+              </div>
+
+              <div className="text-sm text-gray-700 mb-4 flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <span>{row.DCHI_KHANG}</span>
+              </div>
+
+              <div className="border-t border-gray-100 pt-3">
+                {editingPhone?.maKhang === row.MA_KHANG ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newPhoneInput}
+                      onChange={(e) => setNewPhoneInput(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="Nhập SĐT mới"
+                      autoFocus
+                    />
+                    <button onClick={() => handleUpdatePhone(row)} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => setEditingPhone(null)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Điện thoại liên hệ</div>
+                      <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || 'Chưa có số'}</div>
+                      {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
+                        setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
+                      }}
+                      className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
+                    >
+                      <Edit2 className="h-4 w-4" /> Sửa
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto bg-white rounded-lg border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan={11} className="px-6 py-8 text-center text-gray-500">
-                  Không tìm thấy dữ liệu phù hợp.
-                </td>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Kỳ HĐ</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tháng HĐ</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Năm HĐ</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[250px]">Địa Chỉ</th>
               </tr>
-            ) : (
-              details.map((row, idx) => (
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {details.map((row, idx) => (
                 <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{row.TEN_KHANG}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.KY_HD}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.THANG_HD}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.NAM_HD}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{row.TEN_KHANG}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KY_HD}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.THANG_HD}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.NAM_HD}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     {editingPhone?.maKhang === row.MA_KHANG ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <input
                           type="text"
                           value={newPhoneInput}
                           onChange={(e) => setNewPhoneInput(e.target.value)}
-                          className="w-32 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Nhập SĐT mới"
+                          className="w-28 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                          placeholder="SĐT mới"
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleUpdatePhone(row);
@@ -574,7 +644,7 @@ export default function App() {
                             setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
                             setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
                           }}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all ml-2"
                           title="Cập nhật số điện thoại"
                         >
                           <Edit2 className="h-4 w-4" />
@@ -582,9 +652,9 @@ export default function App() {
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
                     <div className="flex items-start justify-between gap-2">
                       <span>{row.DCHI_KHANG}</span>
                       {row.DCHI_KHANG && (
@@ -601,63 +671,134 @@ export default function App() {
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
 
   const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => {
+    if (details.length === 0) {
+      return (
+        <div className="p-8 text-center text-gray-500 bg-white rounded-lg border border-gray-200">
+          Không có dữ liệu tồn nợ cho nhóm này.
+        </div>
+      );
+    }
+
     return (
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">DANHSO</th>
-              {showGroupColumn && (
-                <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
-              )}
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số Kỳ</th>
-              <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
-              <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">Địa Chỉ</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {details.length === 0 ? (
+      <div className="space-y-4">
+        {/* Mobile Card View */}
+        <div className="block md:hidden space-y-4">
+          {details.map((row, idx) => (
+            <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+              <div className="flex justify-between items-start mb-3">
+                <div>
+                  <div className="text-xs text-gray-500 mb-1">STT: {row.STT} {showGroupColumn && `• Nhóm: ${row.NHOM}`}</div>
+                  <div className="font-bold text-blue-600 text-lg">{row.MA_KHANG}</div>
+                  <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-bold text-red-600 text-lg">{formatCurrency(row.TONG_NO)}</div>
+                  <div className="text-sm text-gray-500">{row.SO_KY} kỳ nợ</div>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg">
+                <div><span className="text-gray-400">Danh bộ:</span> {row.DANHSO}</div>
+                <div><span className="text-gray-400">Sổ GCS:</span> {row.MA_SOGCS}</div>
+                <div className="col-span-2"><span className="text-gray-400">Số TBI:</span> {row.SO_TBI}</div>
+              </div>
+
+              <div className="text-sm text-gray-700 mb-4 flex items-start gap-2">
+                <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <span>{row.DCHI_KHANG}</span>
+              </div>
+
+              <div className="border-t border-gray-100 pt-3">
+                {editingPhone?.maKhang === row.MA_KHANG ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={newPhoneInput}
+                      onChange={(e) => setNewPhoneInput(e.target.value)}
+                      className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                      placeholder="Nhập SĐT mới"
+                      autoFocus
+                    />
+                    <button onClick={() => handleUpdatePhone(row)} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
+                      <Check className="h-4 w-4" />
+                    </button>
+                    <button onClick={() => setEditingPhone(null)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-xs text-gray-500 mb-1">Điện thoại liên hệ</div>
+                      <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || 'Chưa có số'}</div>
+                      {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
+                        setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
+                      }}
+                      className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
+                    >
+                      <Edit2 className="h-4 w-4" /> Sửa
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table View */}
+        <div className="hidden md:block overflow-x-auto bg-white rounded-lg border border-gray-200">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
               <tr>
-                <td colSpan={showGroupColumn ? 11 : 10} className="px-6 py-8 text-center text-gray-500">
-                  Không có dữ liệu tồn nợ cho nhóm này.
-                </td>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">DANHSO</th>
+                {showGroupColumn && (
+                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
+                )}
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số Kỳ</th>
+                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
+                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[250px]">Địa Chỉ</th>
               </tr>
-            ) : (
-              details.map((row, idx) => (
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {details.map((row, idx) => (
                 <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.DANHSO}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{row.DANHSO}</td>
                   {showGroupColumn && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
+                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
                   )}
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900">{row.TEN_KHANG}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.SO_KY}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
+                  <td className="px-4 py-3 text-sm text-gray-900">{row.TEN_KHANG}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.SO_KY}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
                     {editingPhone?.maKhang === row.MA_KHANG ? (
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1">
                         <input
                           type="text"
                           value={newPhoneInput}
                           onChange={(e) => setNewPhoneInput(e.target.value)}
-                          className="w-32 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          placeholder="Nhập SĐT mới"
+                          className="w-28 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+                          placeholder="SĐT mới"
                           autoFocus
                           onKeyDown={(e) => {
                             if (e.key === 'Enter') handleUpdatePhone(row);
@@ -682,7 +823,7 @@ export default function App() {
                             setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
                             setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
                           }}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all"
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all ml-2"
                           title="Cập nhật số điện thoại"
                         >
                           <Edit2 className="h-4 w-4" />
@@ -690,9 +831,9 @@ export default function App() {
                       </div>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
-                  <td className="px-6 py-4 text-sm text-gray-500">
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
+                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
+                  <td className="px-4 py-3 text-sm text-gray-500">
                     <div className="flex items-start justify-between gap-2">
                       <span>{row.DCHI_KHANG}</span>
                       {row.DCHI_KHANG && (
@@ -709,10 +850,10 @@ export default function App() {
                     </div>
                   </td>
                 </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };
@@ -1213,10 +1354,58 @@ export default function App() {
                         ) : (
                           Object.entries(groupedByNhom).map(([nhom, items]) => (
                             <div key={nhom} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                              <div className="px-6 py-4 border-b border-gray-200 bg-pink-50/50">
+                              <div className="p-4 sm:px-6 sm:py-4 border-b border-gray-200 bg-pink-50/50">
                                 <h4 className="text-lg font-semibold text-gray-800">Nhóm: {nhom} <span className="text-sm font-normal text-gray-500 ml-2">({items.length} yêu cầu)</span></h4>
                               </div>
-                              <div className="overflow-x-auto">
+                              
+                              {/* Mobile Card View */}
+                              <div className="block md:hidden p-4 space-y-4">
+                                {items.map((item, idx) => (
+                                  <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                                    <div className="flex justify-between items-start mb-3">
+                                      <div>
+                                        <div className="text-xs text-gray-500 mb-1">STT: {idx + 1}</div>
+                                        <div className="font-bold text-blue-600 text-lg">{item.MA_KHANG}</div>
+                                        <div className="font-medium text-gray-900">{item.TEN_KHANG}</div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-xs text-gray-500 mb-1">{item.THOI_GIAN}</div>
+                                        {statusFilter === 'Mới đề nghị' ? (
+                                          <button
+                                            onClick={() => handleUpdateStatus(item)}
+                                            className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors"
+                                          >
+                                            Cập nhật
+                                          </button>
+                                        ) : (
+                                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            Đã cập nhật
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                    
+                                    <div className="text-sm text-gray-700 mb-3 flex items-start gap-2">
+                                      <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                                      <span>{item.DCHI_KHANG}</span>
+                                    </div>
+
+                                    <div className="grid grid-cols-2 gap-2 text-sm bg-gray-50 p-3 rounded-lg">
+                                      <div>
+                                        <div className="text-xs text-gray-500 mb-0.5">SĐT Cũ</div>
+                                        <div className="font-medium text-gray-600">{item.DTHOAI_CU || 'Không có'}</div>
+                                      </div>
+                                      <div>
+                                        <div className="text-xs text-gray-500 mb-0.5">SĐT Mới</div>
+                                        <div className="font-medium text-green-600">{item.DTHOAI_MOI}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {/* Desktop Table View */}
+                              <div className="hidden md:block overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                   <thead className="bg-gray-50">
                                     <tr>
