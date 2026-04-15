@@ -31,6 +31,7 @@ export default function App() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'tab1' | 'tab2' | 'tab3' | 'tab4' | 'tab5'>('tab1');
+  const [activeTab2SubTab, setActiveTab2SubTab] = useState<'nhom' | 'phien'>('nhom');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedGroupTab3, setSelectedGroupTab3] = useState<string>('');
   const [activeRegionTab, setActiveRegionTab] = useState<string>('Vũng Tàu');
@@ -374,6 +375,112 @@ export default function App() {
       total
     };
   }, [tonData, khangToNhom, groups]);
+
+  // Tab 2 Data: Thống kê tồn các phiên
+  const tab2PhienData = useMemo(() => {
+    const phienMap = new Map<string, {
+      PHIEN: string;
+      KH_SET: Set<string>;
+      HD_TON: number;
+      TONG_TIEN: number;
+      TONG_THUE: number;
+      TONG_VC: number;
+      TONG_THUE_VC: number;
+      CUSTOMER_STATS: Map<string, { TONG_TIEN: number; SO_HD: number }>;
+    }>();
+
+    tonData.forEach(row => {
+      const maSoGCS = row['MA_SOGCS'] || '';
+      const phien = maSoGCS.substring(0, 3) || 'Khác';
+      const maKhang = row['MA_KHANG'];
+      const tongTien = parseFloat(row['TONG_NO'] || '0') || 0;
+      const tongThue = parseFloat(row['THUE'] || '0') || 0;
+      const tongVC = parseFloat(row['TIEN_VC'] || '0') || 0;
+      const tongThueVC = parseFloat(row['THUE_VC'] || '0') || 0;
+
+      if (!phienMap.has(phien)) {
+        phienMap.set(phien, {
+          PHIEN: phien,
+          KH_SET: new Set(),
+          HD_TON: 0,
+          TONG_TIEN: 0,
+          TONG_THUE: 0,
+          TONG_VC: 0,
+          TONG_THUE_VC: 0,
+          CUSTOMER_STATS: new Map()
+        });
+      }
+
+      const phienStat = phienMap.get(phien)!;
+      if (maKhang) {
+        phienStat.KH_SET.add(maKhang);
+        
+        if (!phienStat.CUSTOMER_STATS.has(maKhang)) {
+          phienStat.CUSTOMER_STATS.set(maKhang, { TONG_TIEN: 0, SO_HD: 0 });
+        }
+        const custStat = phienStat.CUSTOMER_STATS.get(maKhang)!;
+        custStat.TONG_TIEN += tongTien;
+        custStat.SO_HD += 1;
+      }
+      
+      phienStat.HD_TON += 1;
+      phienStat.TONG_TIEN += tongTien;
+      phienStat.TONG_THUE += tongThue;
+      phienStat.TONG_VC += tongVC;
+      phienStat.TONG_THUE_VC += tongThueVC;
+    });
+
+    const result = Array.from(phienMap.values()).map(stat => {
+      let khLonHon5M = 0;
+      let khTu1Den5M = 0;
+      let khCo2HD = 0;
+      let khCoTu3HD = 0;
+
+      stat.CUSTOMER_STATS.forEach(cust => {
+        if (cust.TONG_TIEN > 5000000) khLonHon5M++;
+        else if (cust.TONG_TIEN >= 1000000 && cust.TONG_TIEN <= 5000000) khTu1Den5M++;
+
+        if (cust.SO_HD === 2) khCo2HD++;
+        else if (cust.SO_HD >= 3) khCoTu3HD++;
+      });
+
+      return {
+        PHIEN: stat.PHIEN,
+        TONG_KH: stat.KH_SET.size,
+        TONG_HD: stat.HD_TON,
+        TONG_TIEN: stat.TONG_TIEN,
+        TONG_THUE: stat.TONG_THUE,
+        TONG_VC: stat.TONG_VC,
+        TONG_THUE_VC: stat.TONG_THUE_VC,
+        KH_LON_HON_5M: khLonHon5M,
+        KH_1_DEN_5M: khTu1Den5M,
+        KH_2_HD: khCo2HD,
+        KH_TU_3_HD: khCoTu3HD
+      };
+    });
+
+    result.sort((a, b) => a.PHIEN.localeCompare(b.PHIEN));
+
+    const total = result.reduce((acc, curr) => ({
+      PHIEN: 'TỔNG CỘNG',
+      TONG_KH: acc.TONG_KH + curr.TONG_KH,
+      TONG_HD: acc.TONG_HD + curr.TONG_HD,
+      TONG_TIEN: acc.TONG_TIEN + curr.TONG_TIEN,
+      TONG_THUE: acc.TONG_THUE + curr.TONG_THUE,
+      TONG_VC: acc.TONG_VC + curr.TONG_VC,
+      TONG_THUE_VC: acc.TONG_THUE_VC + curr.TONG_THUE_VC,
+      KH_LON_HON_5M: acc.KH_LON_HON_5M + curr.KH_LON_HON_5M,
+      KH_1_DEN_5M: acc.KH_1_DEN_5M + curr.KH_1_DEN_5M,
+      KH_2_HD: acc.KH_2_HD + curr.KH_2_HD,
+      KH_TU_3_HD: acc.KH_TU_3_HD + curr.KH_TU_3_HD
+    }), {
+      PHIEN: 'TỔNG CỘNG',
+      TONG_KH: 0, TONG_HD: 0, TONG_TIEN: 0, TONG_THUE: 0, TONG_VC: 0, TONG_THUE_VC: 0,
+      KH_LON_HON_5M: 0, KH_1_DEN_5M: 0, KH_2_HD: 0, KH_TU_3_HD: 0
+    });
+
+    return { data: result, total };
+  }, [tonData]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(value);
@@ -1085,46 +1192,130 @@ export default function App() {
             {activeTab === 'tab2' && (
               <div className="space-y-6 animate-in fade-in duration-300">
                 <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                  <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
-                    <h3 className="text-lg font-medium leading-6 text-gray-900">Thống kê nợ của từng nhóm</h3>
+                  <div className="px-6 py-4 border-b border-gray-200 bg-gray-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                    <div className="flex space-x-1 bg-gray-200 p-1 rounded-lg">
+                      <button
+                        onClick={() => setActiveTab2SubTab('nhom')}
+                        className={cn(
+                          "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                          activeTab2SubTab === 'nhom'
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        )}
+                      >
+                        Theo Nhóm
+                      </button>
+                      <button
+                        onClick={() => setActiveTab2SubTab('phien')}
+                        className={cn(
+                          "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                          activeTab2SubTab === 'phien'
+                            ? "bg-white text-gray-900 shadow-sm"
+                            : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                        )}
+                      >
+                        Theo Phiên
+                      </button>
+                    </div>
                     <button
-                      onClick={() => handleExportExcel([...tab2Data.groups, tab2Data.total], 'ThongKeTongHop')}
+                      onClick={() => {
+                        if (activeTab2SubTab === 'nhom') {
+                          handleExportExcel([...tab2Data.groups, tab2Data.total], 'ThongKeTheoNhom');
+                        } else {
+                          handleExportExcel([...tab2PhienData.data, tab2PhienData.total], 'ThongKeTheoPhien');
+                        }
+                      }}
                       className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
                     >
                       <Download className="h-4 w-4" />
                       Xuất Excel
                     </button>
                   </div>
-                  <div className="overflow-x-auto">
-                    <table className="min-w-full divide-y divide-gray-200">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm</th>
-                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Số Khách Hàng Tồn (KH_Ton)</th>
-                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Số Hóa Đơn Tồn (HD_Ton)</th>
-                          <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng Nợ</th>
-                        </tr>
-                      </thead>
-                      <tbody className="bg-white divide-y divide-gray-200">
-                        {tab2Data.groups.map((row, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.NHOM}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_TON}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.HD_TON}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
+
+                  {activeTab2SubTab === 'nhom' ? (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm</th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Số Khách Hàng Tồn (KH_Ton)</th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Số Hóa Đơn Tồn (HD_Ton)</th>
+                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng Nợ</th>
                           </tr>
-                        ))}
-                      </tbody>
-                      <tfoot className="bg-gray-50 border-t-2 border-gray-200">
-                        <tr>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{tab2Data.total.NHOM}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2Data.total.KH_TON}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2Data.total.HD_TON}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600 text-right">{formatCurrency(tab2Data.total.TONG_NO)}</td>
-                        </tr>
-                      </tfoot>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {tab2Data.groups.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.NHOM}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_TON}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.HD_TON}</td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                          <tr>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{tab2Data.total.NHOM}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2Data.total.KH_TON}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2Data.total.HD_TON}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600 text-right">{formatCurrency(tab2Data.total.TONG_NO)}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Phiên</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH Tồn</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng HĐ Tồn</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Tiền Tồn</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Thuế Tồn</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng VC Tồn</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Thuế VC Tồn</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH &gt; 5tr</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH 1-5tr</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH có 2 HĐ</th>
+                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH &ge; 3 HĐ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {tab2PhienData.data.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
+                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{row.PHIEN}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.TONG_KH}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.TONG_HD}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_TIEN)}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(row.TONG_THUE)}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(row.TONG_VC)}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(row.TONG_THUE_VC)}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_LON_HON_5M}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_1_DEN_5M}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_2_HD}</td>
+                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_TU_3_HD}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                        <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+                          <tr>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">{tab2PhienData.total.PHIEN}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.TONG_KH}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.TONG_HD}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-red-600 text-right">{formatCurrency(tab2PhienData.total.TONG_TIEN)}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{formatCurrency(tab2PhienData.total.TONG_THUE)}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{formatCurrency(tab2PhienData.total.TONG_VC)}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{formatCurrency(tab2PhienData.total.TONG_THUE_VC)}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.KH_LON_HON_5M}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.KH_1_DEN_5M}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.KH_2_HD}</td>
+                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.KH_TU_3_HD}</td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+                  )}
                 </div>
               </div>
             )}
