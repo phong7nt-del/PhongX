@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter } from 'lucide-react';
 import { cn } from './lib/utils';
 
 const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
@@ -22,6 +22,183 @@ const normalizeData = (data: any[]) => {
     return newRow;
   });
 };
+
+interface ColumnDef {
+  key: string;
+  label: string;
+  align?: 'left' | 'right' | 'center';
+  minWidth?: string;
+  render?: (row: any, index: number) => React.ReactNode;
+}
+
+interface FilterableTableProps {
+  data: any[];
+  columns: ColumnDef[];
+  renderMobileCard?: (row: any, index: number) => React.ReactNode;
+  keyExtractor?: (row: any, index: number) => string | number;
+  footerRow?: any;
+  showFilter?: boolean;
+}
+
+function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footerRow, showFilter = false }: FilterableTableProps) {
+  const [filters, setFilters] = useState<Record<string, string>>({});
+  const [openFilter, setOpenFilter] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleClickOutside = () => setOpenFilter(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
+  const filteredData = useMemo(() => {
+    return data.filter(row => {
+      return Object.entries(filters).every(([key, filterValue]) => {
+        if (!filterValue) return true;
+        const val = String(row[key] || '').toLowerCase();
+        return val.includes(String(filterValue).toLowerCase());
+      });
+    });
+  }, [data, filters]);
+
+  return (
+    <div className="space-y-4">
+      {/* Mobile Cards */}
+      {renderMobileCard && (
+        <div className="block md:hidden space-y-4">
+          {/* Mobile Filters */}
+          {showFilter && (
+            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-4">
+              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+                <Search className="h-4 w-4 text-blue-500" />
+                Bộ lọc dữ liệu
+              </h4>
+              <div className="grid grid-cols-2 gap-3">
+                {columns.map(col => (
+                  <div key={col.key}>
+                    <label className="block text-xs text-gray-500 mb-1">{col.label}</label>
+                    <input
+                      type="text"
+                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Lọc..."
+                      value={filters[col.key] || ''}
+                      onChange={e => setFilters(prev => ({ ...prev, [col.key]: e.target.value }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {filteredData.length === 0 ? (
+            <div className="p-8 text-center text-gray-500 bg-white rounded-lg border border-gray-200">
+              Không tìm thấy dữ liệu phù hợp.
+            </div>
+          ) : (
+            filteredData.map((row, idx) => renderMobileCard(row, idx))
+          )}
+        </div>
+      )}
+
+      {/* Desktop Table */}
+      <div className={cn("hidden md:block overflow-x-auto bg-white rounded-lg border border-gray-200 shadow-sm", !renderMobileCard && "block")}>
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-blue-50 border-b border-blue-100">
+            <tr>
+              {columns.map(col => (
+                <th 
+                  key={col.key} 
+                  scope="col" 
+                  className={cn(
+                    "px-4 py-3 text-xs font-bold text-blue-900 uppercase tracking-wider border-r border-blue-200 last:border-0 align-top relative",
+                    col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left',
+                    col.minWidth ? col.minWidth : 'whitespace-nowrap'
+                  )}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span>{col.label}</span>
+                    {showFilter && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenFilter(openFilter === col.key ? null : col.key);
+                        }}
+                        className={cn(
+                          "p-1 rounded hover:bg-blue-200 transition-colors",
+                          filters[col.key] ? "text-blue-600 bg-blue-100" : "text-gray-400"
+                        )}
+                      >
+                        <Filter className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  {showFilter && openFilter === col.key && (
+                    <div 
+                      className="mt-2 p-2 bg-white rounded-lg shadow-sm border border-gray-200 min-w-[150px]"
+                      onClick={e => e.stopPropagation()}
+                    >
+                      <input
+                        type="text"
+                        className="w-full px-2 py-1.5 text-sm text-gray-900 bg-white border border-gray-300 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 placeholder-gray-400 font-normal"
+                        placeholder={`Lọc ${col.label}...`}
+                        value={filters[col.key] || ''}
+                        onChange={e => setFilters(prev => ({ ...prev, [col.key]: e.target.value }))}
+                        autoFocus
+                      />
+                    </div>
+                  )}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredData.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
+                  Không tìm thấy dữ liệu phù hợp.
+                </td>
+              </tr>
+            ) : (
+              filteredData.map((row, idx) => (
+                <tr key={keyExtractor ? keyExtractor(row, idx) : idx} className="hover:bg-blue-50/50 transition-colors">
+                  {columns.map(col => (
+                    <td 
+                      key={col.key} 
+                      className={cn(
+                        "px-4 py-3 text-sm text-gray-700",
+                        col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left',
+                        !col.minWidth && 'whitespace-nowrap'
+                      )}
+                    >
+                      {col.render ? col.render(row, idx) : row[col.key]}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
+          </tbody>
+          {footerRow && (
+            <tfoot className="bg-gray-50 border-t-2 border-gray-200">
+              <tr>
+                {columns.map(col => (
+                  <td 
+                    key={col.key} 
+                    className={cn(
+                      "px-4 py-3 text-sm font-bold text-gray-900",
+                      col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left',
+                      !col.minWidth && 'whitespace-nowrap'
+                    )}
+                  >
+                    {col.render ? col.render(footerRow, -1) : footerRow[col.key]}
+                  </td>
+                ))}
+              </tr>
+            </tfoot>
+          )}
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export default function App() {
   const [tonData, setTonData] = useState<any[]>([]);
@@ -683,171 +860,141 @@ export default function App() {
       );
     }
 
-    return (
-      <div className="space-y-4">
-        {/* Mobile Card View */}
-        <div className="block md:hidden space-y-4">
-          {details.map((row, idx) => (
-            <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">STT: {row.STT} • Nhóm: {row.NHOM}</div>
-                  <div className="font-bold text-blue-600 text-lg">{row.MA_KHANG}</div>
-                  <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-red-600 text-lg">{formatCurrency(row.TONG_NO)}</div>
-                  <div className="text-sm text-gray-500">Kỳ: {row.KY_HD}/{row.THANG_HD}/{row.NAM_HD}</div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg">
-                <div><span className="text-gray-400">Sổ GCS:</span> {row.MA_SOGCS}</div>
-                <div><span className="text-gray-400">Số TBI:</span> {row.SO_TBI}</div>
-              </div>
-
-              <div className="text-sm text-gray-700 mb-4 flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                <span>{row.DCHI_KHANG}</span>
-              </div>
-
-              <div className="border-t border-gray-100 pt-3">
-                {editingPhone?.maKhang === row.MA_KHANG ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newPhoneInput}
-                      onChange={(e) => setNewPhoneInput(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      placeholder="Nhập SĐT mới"
-                      autoFocus
-                    />
-                    <button onClick={() => handleUpdatePhone(row)} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => setEditingPhone(null)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Điện thoại liên hệ</div>
-                      <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || 'Chưa có số'}</div>
-                      {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
-                        setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
-                      }}
-                      className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
-                    >
-                      <Edit2 className="h-4 w-4" /> Sửa
-                    </button>
-                  </div>
-                )}
-              </div>
+    const columns: ColumnDef[] = [
+      { key: 'STT', label: 'STT' },
+      { key: 'NHOM', label: 'Nhóm' },
+      { key: 'MA_KHANG', label: 'Mã Khách', render: (row: any) => <span className="text-blue-600 font-medium">{row.MA_KHANG}</span> },
+      { key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' },
+      { key: 'KY_HD', label: 'Kỳ HĐ', align: 'right' },
+      { key: 'THANG_HD', label: 'Tháng HĐ', align: 'right' },
+      { key: 'NAM_HD', label: 'Năm HĐ', align: 'right' },
+      { key: 'TONG_NO', label: 'Tổng Nợ', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_NO)}</span> },
+      { key: 'DTHOAI_DVU', label: 'Điện Thoại', render: (row: any) => (
+        editingPhone?.maKhang === row.MA_KHANG ? (
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={newPhoneInput}
+              onChange={(e) => setNewPhoneInput(e.target.value)}
+              className="w-28 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+              placeholder="SĐT mới"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleUpdatePhone(row);
+                if (e.key === 'Escape') setEditingPhone(null);
+              }}
+            />
+            <button onClick={() => handleUpdatePhone(row)} className="p-1 text-green-600 hover:bg-green-50 rounded">
+              <Check className="h-4 w-4" />
+            </button>
+            <button onClick={() => setEditingPhone(null)} className="p-1 text-red-600 hover:bg-red-50 rounded">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="group flex items-center justify-between">
+            <div>
+              <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU}</div>
+              {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
             </div>
-          ))}
+            <button 
+              onClick={() => {
+                setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
+                setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
+              }}
+              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all ml-2"
+              title="Cập nhật số điện thoại"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
+          </div>
+        )
+      )},
+      { key: 'MA_SOGCS', label: 'Mã Sổ GCS' },
+      { key: 'SO_TBI', label: 'Số TBI' },
+      { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[250px]', render: (row: any) => (
+        <div className="flex items-start justify-between gap-2">
+          <span>{row.DCHI_KHANG}</span>
+          {row.DCHI_KHANG && (
+            <a 
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.DCHI_KHANG)}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              title="Chỉ đường trên Google Maps"
+              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors"
+            >
+              <MapPin className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+      )}
+    ];
+
+    const renderMobileCard = (row: any, idx: number) => (
+      <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <div className="text-xs text-gray-500 mb-1">STT: {row.STT} • Nhóm: {row.NHOM}</div>
+            <div className="font-bold text-blue-600 text-lg">{row.MA_KHANG}</div>
+            <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>
+          </div>
+          <div className="text-right">
+            <div className="font-bold text-red-600 text-lg">{formatCurrency(row.TONG_NO)}</div>
+            <div className="text-sm text-gray-500">Kỳ: {row.KY_HD}/{row.THANG_HD}/{row.NAM_HD}</div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg">
+          <div><span className="text-gray-400">Sổ GCS:</span> {row.MA_SOGCS}</div>
+          <div><span className="text-gray-400">Số TBI:</span> {row.SO_TBI}</div>
         </div>
 
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto bg-white rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Kỳ HĐ</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tháng HĐ</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Năm HĐ</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[250px]">Địa Chỉ</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {details.map((row, idx) => (
-                <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900">{row.TEN_KHANG}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KY_HD}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.THANG_HD}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.NAM_HD}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingPhone?.maKhang === row.MA_KHANG ? (
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={newPhoneInput}
-                          onChange={(e) => setNewPhoneInput(e.target.value)}
-                          className="w-28 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                          placeholder="SĐT mới"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleUpdatePhone(row);
-                            if (e.key === 'Escape') setEditingPhone(null);
-                          }}
-                        />
-                        <button onClick={() => handleUpdatePhone(row)} className="p-1 text-green-600 hover:bg-green-50 rounded">
-                          <Check className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => setEditingPhone(null)} className="p-1 text-red-600 hover:bg-red-50 rounded">
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="group flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU}</div>
-                          {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
-                        </div>
-                        <button 
-                          onClick={() => {
-                            setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
-                            setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
-                          }}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all ml-2"
-                          title="Cập nhật số điện thoại"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    <div className="flex items-start justify-between gap-2">
-                      <span>{row.DCHI_KHANG}</span>
-                      {row.DCHI_KHANG && (
-                        <a 
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.DCHI_KHANG)}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          title="Chỉ đường trên Google Maps"
-                          className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors"
-                        >
-                          <MapPin className="h-4 w-4" />
-                        </a>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="text-sm text-gray-700 mb-4 flex items-start gap-2">
+          <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+          <span>{row.DCHI_KHANG}</span>
+        </div>
+
+        <div className="border-t border-gray-100 pt-3">
+          {editingPhone?.maKhang === row.MA_KHANG ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newPhoneInput}
+                onChange={(e) => setNewPhoneInput(e.target.value)}
+                className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder="Nhập SĐT mới"
+                autoFocus
+              />
+              <button onClick={() => handleUpdatePhone(row)} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
+                <Check className="h-4 w-4" />
+              </button>
+              <button onClick={() => setEditingPhone(null)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Điện thoại liên hệ</div>
+                <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || 'Chưa có số'}</div>
+                {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
+              </div>
+              <button 
+                onClick={() => {
+                  setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
+                  setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
+                }}
+                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
+              >
+                <Edit2 className="h-4 w-4" /> Sửa
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
+
+    return <FilterableTable data={details} columns={columns} renderMobileCard={renderMobileCard} />;
   };
 
   const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => {
@@ -859,174 +1006,141 @@ export default function App() {
       );
     }
 
-    return (
-      <div className="space-y-4">
-        {/* Mobile Card View */}
-        <div className="block md:hidden space-y-4">
-          {details.map((row, idx) => (
-            <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <div className="text-xs text-gray-500 mb-1">STT: {row.STT} {showGroupColumn && `• Nhóm: ${row.NHOM}`}</div>
-                  <div className="font-bold text-blue-600 text-lg">{row.MA_KHANG}</div>
-                  <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>
-                </div>
-                <div className="text-right">
-                  <div className="font-bold text-red-600 text-lg">{formatCurrency(row.TONG_NO)}</div>
-                  <div className="text-sm text-gray-500">{row.SO_KY} kỳ nợ</div>
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg">
-                <div><span className="text-gray-400">Doanh số:</span> {row.DOANHSO}</div>
-                <div><span className="text-gray-400">Sổ GCS:</span> {row.MA_SOGCS}</div>
-                <div className="col-span-2"><span className="text-gray-400">Số TBI:</span> {row.SO_TBI}</div>
-              </div>
-
-              <div className="text-sm text-gray-700 mb-4 flex items-start gap-2">
-                <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                <span>{row.DCHI_KHANG}</span>
-              </div>
-
-              <div className="border-t border-gray-100 pt-3">
-                {editingPhone?.maKhang === row.MA_KHANG ? (
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={newPhoneInput}
-                      onChange={(e) => setNewPhoneInput(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
-                      placeholder="Nhập SĐT mới"
-                      autoFocus
-                    />
-                    <button onClick={() => handleUpdatePhone(row)} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
-                      <Check className="h-4 w-4" />
-                    </button>
-                    <button onClick={() => setEditingPhone(null)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
-                      <X className="h-4 w-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Điện thoại liên hệ</div>
-                      <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || 'Chưa có số'}</div>
-                      {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
-                    </div>
-                    <button 
-                      onClick={() => {
-                        setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
-                        setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
-                      }}
-                      className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
-                    >
-                      <Edit2 className="h-4 w-4" /> Sửa
-                    </button>
-                  </div>
-                )}
-              </div>
+    const columns: ColumnDef[] = [
+      { key: 'STT', label: 'STT' },
+      { key: 'DOANHSO', label: 'Doanh số' },
+      ...(showGroupColumn ? [{ key: 'NHOM', label: 'Nhóm' }] : []),
+      { key: 'MA_KHANG', label: 'Mã Khách', render: (row: any) => <span className="text-blue-600 font-medium">{row.MA_KHANG}</span> },
+      { key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' },
+      { key: 'SO_KY', label: 'Số Kỳ', align: 'right' },
+      { key: 'TONG_NO', label: 'Tổng Nợ', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_NO)}</span> },
+      { key: 'DTHOAI_DVU', label: 'Điện Thoại', render: (row: any) => (
+        editingPhone?.maKhang === row.MA_KHANG ? (
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              value={newPhoneInput}
+              onChange={(e) => setNewPhoneInput(e.target.value)}
+              className="w-28 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
+              placeholder="SĐT mới"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleUpdatePhone(row);
+                if (e.key === 'Escape') setEditingPhone(null);
+              }}
+            />
+            <button onClick={() => handleUpdatePhone(row)} className="p-1 text-green-600 hover:bg-green-50 rounded">
+              <Check className="h-4 w-4" />
+            </button>
+            <button onClick={() => setEditingPhone(null)} className="p-1 text-red-600 hover:bg-red-50 rounded">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="group flex items-center justify-between">
+            <div>
+              <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU}</div>
+              {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
             </div>
-          ))}
+            <button 
+              onClick={() => {
+                setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
+                setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
+              }}
+              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all ml-2"
+              title="Cập nhật số điện thoại"
+            >
+              <Edit2 className="h-4 w-4" />
+            </button>
+          </div>
+        )
+      )},
+      { key: 'MA_SOGCS', label: 'Mã Sổ GCS' },
+      { key: 'SO_TBI', label: 'Số TBI' },
+      { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[250px]', render: (row: any) => (
+        <div className="flex items-start justify-between gap-2">
+          <span>{row.DCHI_KHANG}</span>
+          {row.DCHI_KHANG && (
+            <a 
+              href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.DCHI_KHANG)}`} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              title="Chỉ đường trên Google Maps"
+              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors"
+            >
+              <MapPin className="h-4 w-4" />
+            </a>
+          )}
+        </div>
+      )}
+    ];
+
+    const renderMobileCard = (row: any, idx: number) => (
+      <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+        <div className="flex justify-between items-start mb-3">
+          <div>
+            <div className="text-xs text-gray-500 mb-1">STT: {row.STT} {showGroupColumn && `• Nhóm: ${row.NHOM}`}</div>
+            <div className="font-bold text-blue-600 text-lg">{row.MA_KHANG}</div>
+            <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>
+          </div>
+          <div className="text-right">
+            <div className="font-bold text-red-600 text-lg">{formatCurrency(row.TONG_NO)}</div>
+            <div className="text-sm text-gray-500">{row.SO_KY} kỳ nợ</div>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-3 bg-gray-50 p-2 rounded-lg">
+          <div><span className="text-gray-400">Doanh số:</span> {row.DOANHSO}</div>
+          <div><span className="text-gray-400">Sổ GCS:</span> {row.MA_SOGCS}</div>
+          <div className="col-span-2"><span className="text-gray-400">Số TBI:</span> {row.SO_TBI}</div>
         </div>
 
-        {/* Desktop Table View */}
-        <div className="hidden md:block overflow-x-auto bg-white rounded-lg border border-gray-200">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Doanh số</th>
-                {showGroupColumn && (
-                  <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Nhóm</th>
-                )}
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số Kỳ</th>
-                <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Nợ</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Điện Thoại</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Sổ GCS</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Số TBI</th>
-                <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[250px]">Địa Chỉ</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {details.map((row, idx) => (
-                <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.STT}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{row.DOANHSO}</td>
-                  {showGroupColumn && (
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.NHOM}</td>
-                  )}
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-blue-600 font-medium">{row.MA_KHANG}</td>
-                  <td className="px-4 py-3 text-sm text-gray-900">{row.TEN_KHANG}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.SO_KY}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">
-                    {editingPhone?.maKhang === row.MA_KHANG ? (
-                      <div className="flex items-center gap-1">
-                        <input
-                          type="text"
-                          value={newPhoneInput}
-                          onChange={(e) => setNewPhoneInput(e.target.value)}
-                          className="w-28 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs"
-                          placeholder="SĐT mới"
-                          autoFocus
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter') handleUpdatePhone(row);
-                            if (e.key === 'Escape') setEditingPhone(null);
-                          }}
-                        />
-                        <button onClick={() => handleUpdatePhone(row)} className="p-1 text-green-600 hover:bg-green-50 rounded">
-                          <Check className="h-4 w-4" />
-                        </button>
-                        <button onClick={() => setEditingPhone(null)} className="p-1 text-red-600 hover:bg-red-50 rounded">
-                          <X className="h-4 w-4" />
-                        </button>
-                      </div>
-                    ) : (
-                      <div className="group flex items-center justify-between">
-                        <div>
-                          <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU}</div>
-                          {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
-                        </div>
-                        <button 
-                          onClick={() => {
-                            setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
-                            setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
-                          }}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all ml-2"
-                          title="Cập nhật số điện thoại"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.MA_SOGCS}</td>
-                  <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-500">{row.SO_TBI}</td>
-                  <td className="px-4 py-3 text-sm text-gray-500">
-                    <div className="flex items-start justify-between gap-2">
-                      <span>{row.DCHI_KHANG}</span>
-                      {row.DCHI_KHANG && (
-                        <a 
-                          href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.DCHI_KHANG)}`} 
-                          target="_blank" 
-                          rel="noopener noreferrer"
-                          title="Chỉ đường trên Google Maps"
-                          className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors"
-                        >
-                          <MapPin className="h-4 w-4" />
-                        </a>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+        <div className="text-sm text-gray-700 mb-4 flex items-start gap-2">
+          <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+          <span>{row.DCHI_KHANG}</span>
+        </div>
+
+        <div className="border-t border-gray-100 pt-3">
+          {editingPhone?.maKhang === row.MA_KHANG ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={newPhoneInput}
+                onChange={(e) => setNewPhoneInput(e.target.value)}
+                className="flex-1 px-3 py-2 border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                placeholder="Nhập SĐT mới"
+                autoFocus
+              />
+              <button onClick={() => handleUpdatePhone(row)} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
+                <Check className="h-4 w-4" />
+              </button>
+              <button onClick={() => setEditingPhone(null)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-between">
+              <div>
+                <div className="text-xs text-gray-500 mb-1">Điện thoại liên hệ</div>
+                <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || 'Chưa có số'}</div>
+                {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
+              </div>
+              <button 
+                onClick={() => {
+                  setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
+                  setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
+                }}
+                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
+              >
+                <Edit2 className="h-4 w-4" /> Sửa
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
+
+    return <FilterableTable data={details} columns={columns} renderMobileCard={renderMobileCard} />;
   };
 
   return (
@@ -1297,88 +1411,36 @@ export default function App() {
                   </div>
 
                   {activeTab2SubTab === 'nhom' ? (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Nhóm</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Số Khách Hàng Tồn (KH_Ton)</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Số Hóa Đơn Tồn (HD_Ton)</th>
-                            <th scope="col" className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng Nợ</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {tab2Data.groups.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{row.NHOM}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_TON}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">{row.HD_TON}</td>
-                              <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_NO)}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-50 border-t-2 border-gray-200">
-                          <tr>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{tab2Data.total.NHOM}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2Data.total.KH_TON}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2Data.total.HD_TON}</td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-red-600 text-right">{formatCurrency(tab2Data.total.TONG_NO)}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
+                    <FilterableTable
+                      showFilter={true}
+                      data={tab2Data.groups}
+                      columns={[
+                        { key: 'NHOM', label: 'Nhóm' },
+                        { key: 'KH_TON', label: 'Số Khách Hàng Tồn (KH_Ton)', align: 'right' },
+                        { key: 'HD_TON', label: 'Số Hóa Đơn Tồn (HD_Ton)', align: 'right' },
+                        { key: 'TONG_NO', label: 'Tổng Nợ', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_NO)}</span> }
+                      ]}
+                      footerRow={tab2Data.total}
+                    />
                   ) : (
-                    <div className="overflow-x-auto">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Phiên</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH Tồn</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng HĐ Tồn</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Tiền Tồn</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Thuế Tồn</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng VC Tồn</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng Thuế VC Tồn</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH &gt; 5tr</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH 1-5tr</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH có 2 HĐ</th>
-                            <th scope="col" className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Tổng KH &ge; 3 HĐ</th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {tab2PhienData.data.map((row, idx) => (
-                            <tr key={idx} className="hover:bg-gray-50 transition-colors">
-                              <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-900">{row.PHIEN}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.TONG_KH}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.TONG_HD}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-red-600 text-right">{formatCurrency(row.TONG_TIEN)}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(row.TONG_THUE)}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(row.TONG_VC)}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{formatCurrency(row.TONG_THUE_VC)}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_LON_HON_5M}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_1_DEN_5M}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_2_HD}</td>
-                              <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 text-right">{row.KH_TU_3_HD}</td>
-                            </tr>
-                          ))}
-                        </tbody>
-                        <tfoot className="bg-gray-50 border-t-2 border-gray-200">
-                          <tr>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">{tab2PhienData.total.PHIEN}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.TONG_KH}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.TONG_HD}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-red-600 text-right">{formatCurrency(tab2PhienData.total.TONG_TIEN)}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{formatCurrency(tab2PhienData.total.TONG_THUE)}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{formatCurrency(tab2PhienData.total.TONG_VC)}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{formatCurrency(tab2PhienData.total.TONG_THUE_VC)}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.KH_LON_HON_5M}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.KH_1_DEN_5M}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.KH_2_HD}</td>
-                            <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900 text-right">{tab2PhienData.total.KH_TU_3_HD}</td>
-                          </tr>
-                        </tfoot>
-                      </table>
-                    </div>
+                    <FilterableTable
+                      showFilter={true}
+                      data={tab2PhienData.data}
+                      columns={[
+                        { key: 'PHIEN', label: 'Phiên' },
+                        { key: 'TONG_KH', label: 'Tổng KH Tồn', align: 'right' },
+                        { key: 'TONG_HD', label: 'Tổng HĐ Tồn', align: 'right' },
+                        { key: 'TONG_TIEN', label: 'Tổng Tiền Tồn', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_TIEN)}</span> },
+                        { key: 'TONG_THUE', label: 'Tổng Thuế Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_THUE) },
+                        { key: 'TONG_VC', label: 'Tổng VC Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_VC) },
+                        { key: 'TONG_THUE_VC', label: 'Tổng Thuế VC Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_THUE_VC) },
+                        { key: 'KH_LON_HON_5M', label: 'Tổng KH > 5tr', align: 'right' },
+                        { key: 'KH_1_DEN_5M', label: 'Tổng KH 1-5tr', align: 'right' },
+                        { key: 'KH_2_HD', label: 'Tổng KH có 2 HĐ', align: 'right' },
+                        { key: 'KH_TU_3_HD', label: 'Tổng KH ≥ 3 HĐ', align: 'right' }
+                      ]}
+                      footerRow={tab2PhienData.total}
+                    />
                   )}
                 </div>
               </div>
@@ -1632,27 +1694,50 @@ export default function App() {
                             <p className="text-gray-500">Không có dữ liệu đề nghị cập nhật cho khu vực này.</p>
                           </div>
                         ) : (
-                          Object.entries(groupedByNhom).map(([nhom, items]) => (
+                          Object.entries(groupedByNhom).map(([nhom, items]: [string, any]) => (
                             <div key={nhom} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                               <div className="p-4 sm:px-6 sm:py-4 border-b border-gray-200 bg-pink-50/50">
                                 <h4 className="text-lg font-semibold text-gray-800">Nhóm: {nhom} <span className="text-sm font-normal text-gray-500 ml-2">({items.length} yêu cầu)</span></h4>
                               </div>
                               
-                              {/* Mobile Card View */}
-                              <div className="block md:hidden p-4 space-y-4">
-                                {items.map((item, idx) => (
+                              <FilterableTable
+                                data={items.map((item, idx) => ({ ...item, STT: idx + 1 }))}
+                                columns={[
+                                  { key: 'STT', label: 'STT' },
+                                  { key: 'MA_KHANG', label: 'Mã Khách', render: (row: any) => <span className="text-blue-600 font-medium">{row.MA_KHANG}</span> },
+                                  { key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' },
+                                  { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[300px]' },
+                                  { key: 'DTHOAI_CU', label: 'SĐT Cũ' },
+                                  { key: 'DTHOAI_MOI', label: 'SĐT Mới', render: (row: any) => <span className="font-medium text-green-600">{row.DTHOAI_MOI}</span> },
+                                  { key: 'THOI_GIAN', label: 'Thời Gian' },
+                                  { key: 'ACTION', label: 'Thao tác', align: 'center', render: (row: any) => (
+                                    statusFilter === 'Mới đề nghị' ? (
+                                      <button
+                                        onClick={() => handleUpdateStatus(row)}
+                                        className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors"
+                                      >
+                                        Cập nhật
+                                      </button>
+                                    ) : (
+                                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                        Đã cập nhật
+                                      </span>
+                                    )
+                                  )}
+                                ]}
+                                renderMobileCard={(row: any, idx: number) => (
                                   <div key={idx} className="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                                     <div className="flex justify-between items-start mb-3">
                                       <div>
-                                        <div className="text-xs text-gray-500 mb-1">STT: {idx + 1}</div>
-                                        <div className="font-bold text-blue-600 text-lg">{item.MA_KHANG}</div>
-                                        <div className="font-medium text-gray-900">{item.TEN_KHANG}</div>
+                                        <div className="text-xs text-gray-500 mb-1">STT: {row.STT}</div>
+                                        <div className="font-bold text-blue-600 text-lg">{row.MA_KHANG}</div>
+                                        <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>
                                       </div>
                                       <div className="text-right">
-                                        <div className="text-xs text-gray-500 mb-1">{item.THOI_GIAN}</div>
+                                        <div className="text-xs text-gray-500 mb-1">{row.THOI_GIAN}</div>
                                         {statusFilter === 'Mới đề nghị' ? (
                                           <button
-                                            onClick={() => handleUpdateStatus(item)}
+                                            onClick={() => handleUpdateStatus(row)}
                                             className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors"
                                           >
                                             Cập nhật
@@ -1667,67 +1752,22 @@ export default function App() {
                                     
                                     <div className="text-sm text-gray-700 mb-3 flex items-start gap-2">
                                       <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-                                      <span>{item.DCHI_KHANG}</span>
+                                      <span>{row.DCHI_KHANG}</span>
                                     </div>
 
                                     <div className="grid grid-cols-2 gap-2 text-sm bg-gray-50 p-3 rounded-lg">
                                       <div>
                                         <div className="text-xs text-gray-500 mb-0.5">SĐT Cũ</div>
-                                        <div className="font-medium text-gray-600">{item.DTHOAI_CU || 'Không có'}</div>
+                                        <div className="font-medium text-gray-600">{row.DTHOAI_CU || 'Không có'}</div>
                                       </div>
                                       <div>
                                         <div className="text-xs text-gray-500 mb-0.5">SĐT Mới</div>
-                                        <div className="font-medium text-green-600">{item.DTHOAI_MOI}</div>
+                                        <div className="font-medium text-green-600">{row.DTHOAI_MOI}</div>
                                       </div>
                                     </div>
                                   </div>
-                                ))}
-                              </div>
-
-                              {/* Desktop Table View */}
-                              <div className="hidden md:block overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                  <thead className="bg-gray-50">
-                                    <tr>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">Địa Chỉ</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">SĐT Cũ</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">SĐT Mới</th>
-                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Thời Gian</th>
-                                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Thao tác</th>
-                                    </tr>
-                                  </thead>
-                                  <tbody className="bg-white divide-y divide-gray-200">
-                                    {items.map((item, idx) => (
-                                      <tr key={idx} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{idx + 1}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{item.MA_KHANG}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-900">{item.TEN_KHANG}</td>
-                                        <td className="px-6 py-4 text-sm text-gray-500">{item.DCHI_KHANG}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.DTHOAI_CU}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{item.DTHOAI_MOI}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.THOI_GIAN}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
-                                          {statusFilter === 'Mới đề nghị' ? (
-                                            <button
-                                              onClick={() => handleUpdateStatus(item)}
-                                              className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors"
-                                            >
-                                              Cập nhật
-                                            </button>
-                                          ) : (
-                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                                              Đã cập nhật
-                                            </span>
-                                          )}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
+                                )}
+                              />
                             </div>
                           ))
                         )}
