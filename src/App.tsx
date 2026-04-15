@@ -1,12 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList } from 'lucide-react';
 import { cn } from './lib/utils';
 
 const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
 const TON_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Ton`;
 const CHIANHOM_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=ChiaNhom`;
+const KHUVUC_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=KhuVuc`;
+const CAPNHATSDT_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=CapNhatSDT`;
 
 // Normalize keys to uppercase and trim
 const normalizeData = (data: any[]) => {
@@ -24,11 +26,14 @@ const normalizeData = (data: any[]) => {
 export default function App() {
   const [tonData, setTonData] = useState<any[]>([]);
   const [chiaNhomData, setChiaNhomData] = useState<any[]>([]);
+  const [khuVucData, setKhuVucData] = useState<any[]>([]);
+  const [capNhatSdtData, setCapNhatSdtData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'tab1' | 'tab2' | 'tab3' | 'tab4'>('tab1');
+  const [activeTab, setActiveTab] = useState<'tab1' | 'tab2' | 'tab3' | 'tab4' | 'tab5'>('tab1');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedGroupTab3, setSelectedGroupTab3] = useState<string>('');
+  const [activeRegionTab, setActiveRegionTab] = useState<string>('Vũng Tàu');
   
   // Tab 4 Search State
   const [searchQueryInput, setSearchQueryInput] = useState('');
@@ -41,13 +46,15 @@ export default function App() {
   const [editingPhone, setEditingPhone] = useState<{ maKhang: string, currentPhone: string } | null>(null);
   const [newPhoneInput, setNewPhoneInput] = useState('');
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+  const [statusUpdates, setStatusUpdates] = useState<Record<string, string>>({});
+  const [statusFilter, setStatusFilter] = useState<'Mới đề nghị' | 'Đã cập nhật'>('Mới đề nghị');
 
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
       setError(null);
       try {
-        const [tonRes, chiaNhomRes] = await Promise.all([
+        const [tonRes, chiaNhomRes, khuVucRes, capNhatSdtRes] = await Promise.all([
           new Promise<any[]>((resolve, reject) => {
             Papa.parse(TON_URL, {
               download: true,
@@ -65,11 +72,31 @@ export default function App() {
               complete: (results) => resolve(normalizeData(results.data)),
               error: (err) => reject(err),
             });
+          }),
+          new Promise<any[]>((resolve, reject) => {
+            Papa.parse(KHUVUC_URL, {
+              download: true,
+              header: true,
+              skipEmptyLines: true,
+              complete: (results) => resolve(normalizeData(results.data)),
+              error: (err) => resolve([]), // Don't fail if sheet doesn't exist
+            });
+          }),
+          new Promise<any[]>((resolve, reject) => {
+            Papa.parse(CAPNHATSDT_URL, {
+              download: true,
+              header: true,
+              skipEmptyLines: true,
+              complete: (results) => resolve(normalizeData(results.data)),
+              error: (err) => resolve([]), // Don't fail if sheet doesn't exist
+            });
           })
         ]);
 
         setTonData(tonRes);
         setChiaNhomData(chiaNhomRes);
+        setKhuVucData(khuVucRes);
+        setCapNhatSdtData(capNhatSdtRes);
       } catch (err: any) {
         console.error(err);
         setError('Không thể tải dữ liệu từ Google Sheets. Vui lòng kiểm tra lại quyền truy cập của link (cần chia sẻ "Bất kỳ ai có liên kết đều có thể xem").');
@@ -103,6 +130,63 @@ export default function App() {
     });
     return map;
   }, [chiaNhomData]);
+
+  // Map Nhom to KhuVuc
+  const nhomToKhuVuc = useMemo(() => {
+    const map = new Map<string, string>();
+    khuVucData.forEach(row => {
+      const nhom = row['NHÓM'] || row['NHOM'] || row['TÊN NHÓM'];
+      const khuVuc = row['KHU VỰC'] || row['KHUVUC'] || row['KHU_VUC'];
+      if (nhom && khuVuc) {
+        map.set(nhom, khuVuc);
+      }
+    });
+    return map;
+  }, [khuVucData]);
+
+  // Combine fetched CapNhatSDT and current session phoneUpdateLog
+  const allUpdates = useMemo(() => {
+    const fetchedUpdates = capNhatSdtData.map(row => ({
+      NHOM: row['NHÓM'] || row['NHOM'] || '',
+      MA_KHANG: row['MÃ KHÁCH HÀNG'] || row['MA_KHANG'] || row['MÃ KHÁCH'] || '',
+      TEN_KHANG: row['TÊN KHÁCH'] || row['TEN_KHANG'] || row['TÊN KHÁCH HÀNG'] || '',
+      DCHI_KHANG: row['ĐỊA CHỈ'] || row['DIA_CHI'] || row['DCHI_KHANG'] || '',
+      DTHOAI_CU: row['DTHOAI_DVU CU'] || row['ĐIỆN THOẠI CŨ'] || row['SDT_CU'] || row['DTHOAI_CU'] || '',
+      DTHOAI_MOI: row['DTHOAI_DVU MOI'] || row['ĐIỆN THOẠI MỚI'] || row['SDT_MOI'] || row['DTHOAI_MOI'] || '',
+      THOI_GIAN: row['TGIAN_CAPNHAT'] || row['THỜI GIAN CẬP NHẬT'] || row['THOI_GIAN'] || row['NGÀY'] || ''
+    })).filter(row => row.MA_KHANG);
+
+    const fetchedMaKhangs = new Set(fetchedUpdates.map(u => u.MA_KHANG));
+    const sessionUpdates = phoneUpdateLog.filter(u => !fetchedMaKhangs.has(u.MA_KHANG));
+
+    return [...fetchedUpdates, ...sessionUpdates].map(u => ({
+      ...u,
+      TRANG_THAI: statusUpdates[u.MA_KHANG] || u.TRANG_THAI || 'Mới đề nghị'
+    }));
+  }, [capNhatSdtData, phoneUpdateLog, statusUpdates]);
+
+  // Group updates by Region
+  const updatesByRegion = useMemo(() => {
+    const grouped: Record<string, any[]> = {
+      'Vũng Tàu': [],
+      'Bà Rịa': [],
+      'Phú Mỹ': [],
+      'Côn Đảo': [],
+      'Khác': []
+    };
+
+    allUpdates.filter(u => u.TRANG_THAI === statusFilter).forEach(update => {
+      const region = nhomToKhuVuc.get(update.NHOM) || update.NHOM || 'Khác';
+      const regionLower = region.toLowerCase();
+      if (regionLower.includes('vũng tàu') || regionLower.includes('vung tau')) grouped['Vũng Tàu'].push(update);
+      else if (regionLower.includes('bà rịa') || regionLower.includes('ba ria')) grouped['Bà Rịa'].push(update);
+      else if (regionLower.includes('phú mỹ') || regionLower.includes('phu my')) grouped['Phú Mỹ'].push(update);
+      else if (regionLower.includes('côn đảo') || regionLower.includes('con dao')) grouped['Côn Đảo'].push(update);
+      else grouped['Khác'].push(update);
+    });
+
+    return grouped;
+  }, [allUpdates, nhomToKhuVuc, statusFilter]);
 
   // Aggregate ALL data by Ma_Khang first
   const allAggregatedData = useMemo(() => {
@@ -315,13 +399,15 @@ export default function App() {
       const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
       
       const payload = {
+        action: 'updatePhone',
         nhom: row.NHOM || '',
         maKhang: row.MA_KHANG || '',
         tenKhang: row.TEN_KHANG || '',
         diaChi: row.DCHI_KHANG || '',
         sdtCu: currentPhone,
         sdtMoi: newPhone,
-        thoiGian: formattedDate
+        thoiGian: formattedDate,
+        trangThai: 'Mới đề nghị'
       };
 
       // Call Google Apps Script Web App
@@ -351,7 +437,8 @@ export default function App() {
           DCHI_KHANG: row.DCHI_KHANG,
           DTHOAI_CU: currentPhone,
           DTHOAI_MOI: newPhone,
-          THOI_GIAN: formattedDate
+          THOI_GIAN: formattedDate,
+          TRANG_THAI: 'Mới đề nghị'
         }
       ]);
       
@@ -362,6 +449,36 @@ export default function App() {
       alert('Có lỗi xảy ra khi cập nhật số điện thoại. Vui lòng thử lại!');
     } finally {
       setIsUpdatingPhone(false);
+    }
+  };
+
+  const handleUpdateStatus = async (update: any) => {
+    try {
+      const payload = {
+        action: 'updateStatus',
+        maKhang: update.MA_KHANG,
+        trangThai: 'Đã cập nhật'
+      };
+
+      await fetch('https://script.google.com/macros/s/AKfycbxPNRJ24wCy7dgrSQ21E3_ZZTNzW8GvfHoA1_qH13qkVNV3IVOy7FPUmb0O0rj6MbGm/exec', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // Update local state
+      setStatusUpdates(prev => ({
+        ...prev,
+        [update.MA_KHANG]: 'Đã cập nhật'
+      }));
+      
+      alert(`Đã cập nhật trạng thái cho khách hàng ${update.TEN_KHANG}`);
+    } catch (error) {
+      console.error('Error updating status:', error);
+      alert('Có lỗi xảy ra khi cập nhật trạng thái. Vui lòng thử lại!');
     }
   };
 
@@ -695,6 +812,25 @@ export default function App() {
                   <Search className={cn("h-5 w-5", activeTab === 'tab4' ? "text-orange-100" : "text-orange-500")} />
                   Tab 4: Tìm kiếm
                 </button>
+                <button
+                  onClick={() => setActiveTab('tab5')}
+                  className={cn(
+                    "flex items-center gap-2 px-5 py-3 rounded-xl font-semibold text-sm transition-all duration-200 border-b-4 relative",
+                    activeTab === 'tab5'
+                      ? "bg-gradient-to-br from-pink-500 to-pink-600 text-white border-pink-700 shadow-md transform translate-y-0"
+                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-gray-300 hover:text-pink-600 shadow-sm"
+                  )}
+                >
+                  <div className="relative">
+                    <ClipboardList className={cn("h-5 w-5", activeTab === 'tab5' ? "text-pink-100" : "text-pink-500")} />
+                    {allUpdates.length > 0 && (
+                      <span className="absolute -top-2 -right-2.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-bold text-white ring-2 ring-white">
+                        {allUpdates.length}
+                      </span>
+                    )}
+                  </div>
+                  Tab 5: Đề nghị cập nhật
+                </button>
               </nav>
             </div>
             
@@ -1004,6 +1140,132 @@ export default function App() {
                     </div>
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Tab 5 Content */}
+            {activeTab === 'tab5' && (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                  <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <ClipboardList className="h-6 w-6 text-pink-600" />
+                    Thống kê danh sách đề nghị cập nhật SĐT
+                  </h2>
+                  
+                  {/* Region Sub-tabs and Status Filter */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 mb-6 pb-2">
+                    <div className="flex space-x-2 overflow-x-auto">
+                      {['Vũng Tàu', 'Bà Rịa', 'Phú Mỹ', 'Côn Đảo'].map(region => (
+                        <button
+                          key={region}
+                          onClick={() => setActiveRegionTab(region)}
+                          className={cn(
+                            "px-4 py-2 font-medium text-sm rounded-t-lg transition-colors border-b-2 whitespace-nowrap",
+                            activeRegionTab === region
+                              ? "border-pink-500 text-pink-600 bg-pink-50"
+                              : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
+                          )}
+                        >
+                          Khu vực {region} ({updatesByRegion[region]?.length || 0})
+                        </button>
+                      ))}
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="statusFilter" className="text-sm font-medium text-gray-700">Trạng thái:</label>
+                      <select
+                        id="statusFilter"
+                        value={statusFilter}
+                        onChange={(e) => setStatusFilter(e.target.value as 'Mới đề nghị' | 'Đã cập nhật')}
+                        className="block w-40 pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 rounded-lg border appearance-none bg-white"
+                      >
+                        <option value="Mới đề nghị">Mới đề nghị</option>
+                        <option value="Đã cập nhật">Đã cập nhật</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  {/* Render selected region data */}
+                  {(() => {
+                    const data = updatesByRegion[activeRegionTab] || [];
+                    const groupedByNhom = data.reduce((acc, curr) => {
+                      if (!acc[curr.NHOM]) acc[curr.NHOM] = [];
+                      acc[curr.NHOM].push(curr);
+                      return acc;
+                    }, {} as Record<string, any[]>);
+
+                    return (
+                      <div className="space-y-6">
+                        <div className="flex justify-end">
+                          <button
+                            onClick={() => handleExportExcel(data, `DeNghiCapNhat_${activeRegionTab.replace(/\s+/g, '')}`)}
+                            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors shadow-sm"
+                          >
+                            <Download className="h-4 w-4" />
+                            Xuất Excel Khu Vực {activeRegionTab}
+                          </button>
+                        </div>
+                        
+                        {Object.keys(groupedByNhom).length === 0 ? (
+                          <div className="text-center py-12 bg-gray-50 rounded-xl border border-gray-200">
+                            <p className="text-gray-500">Không có dữ liệu đề nghị cập nhật cho khu vực này.</p>
+                          </div>
+                        ) : (
+                          Object.entries(groupedByNhom).map(([nhom, items]) => (
+                            <div key={nhom} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                              <div className="px-6 py-4 border-b border-gray-200 bg-pink-50/50">
+                                <h4 className="text-lg font-semibold text-gray-800">Nhóm: {nhom} <span className="text-sm font-normal text-gray-500 ml-2">({items.length} yêu cầu)</span></h4>
+                              </div>
+                              <div className="overflow-x-auto">
+                                <table className="min-w-full divide-y divide-gray-200">
+                                  <thead className="bg-gray-50">
+                                    <tr>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">STT</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Mã Khách</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[200px]">Tên Khách</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider min-w-[300px]">Địa Chỉ</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">SĐT Cũ</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">SĐT Mới</th>
+                                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Thời Gian</th>
+                                      <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">Thao tác</th>
+                                    </tr>
+                                  </thead>
+                                  <tbody className="bg-white divide-y divide-gray-200">
+                                    {items.map((item, idx) => (
+                                      <tr key={idx} className="hover:bg-gray-50">
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{idx + 1}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{item.MA_KHANG}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-900">{item.TEN_KHANG}</td>
+                                        <td className="px-6 py-4 text-sm text-gray-500">{item.DCHI_KHANG}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.DTHOAI_CU}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">{item.DTHOAI_MOI}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{item.THOI_GIAN}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-center">
+                                          {statusFilter === 'Mới đề nghị' ? (
+                                            <button
+                                              onClick={() => handleUpdateStatus(item)}
+                                              className="inline-flex items-center px-3 py-1 border border-transparent text-xs leading-4 font-medium rounded-md text-white bg-pink-600 hover:bg-pink-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-pink-500 transition-colors"
+                                            >
+                                              Cập nhật
+                                            </button>
+                                          ) : (
+                                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                              Đã cập nhật
+                                            </span>
+                                          )}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             )}
           </div>
