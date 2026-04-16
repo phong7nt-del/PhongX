@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter, ChevronUp, ChevronDown } from 'lucide-react';
 import { cn } from './lib/utils';
 
 const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
@@ -43,8 +43,8 @@ interface FilterableTableProps {
 function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footerRow, showFilter = false }: FilterableTableProps) {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
-
   const [showMobileFilters, setShowMobileFilters] = useState(false);
+  const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
 
   useEffect(() => {
     const handleClickOutside = () => setOpenFilter(null);
@@ -52,15 +52,50 @@ function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footer
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  const handleSort = (key: string) => {
+    let direction: 'asc' | 'desc' = 'asc';
+    if (sortConfig && sortConfig.key === key && sortConfig.direction === 'asc') {
+      direction = 'desc';
+    }
+    setSortConfig({ key, direction });
+  };
+
   const filteredData = useMemo(() => {
-    return data.filter(row => {
+    let result = data.filter(row => {
       return Object.entries(filters).every(([key, filterValue]) => {
         if (!filterValue) return true;
         const val = String(row[key] || '').toLowerCase();
         return val.includes(String(filterValue).toLowerCase());
       });
     });
-  }, [data, filters]);
+
+    if (sortConfig) {
+      result.sort((a, b) => {
+        const aVal = a[sortConfig.key];
+        const bVal = b[sortConfig.key];
+        
+        if (aVal === bVal) return 0;
+        
+        // Handle numbers
+        const aNum = Number(aVal);
+        const bNum = Number(bVal);
+        
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+          return sortConfig.direction === 'asc' ? aNum - bNum : bNum - aNum;
+        }
+        
+        // Handle strings
+        const aStr = String(aVal || '').toLowerCase();
+        const bStr = String(bVal || '').toLowerCase();
+        
+        if (aStr < bStr) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aStr > bStr) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+
+    return result;
+  }, [data, filters, sortConfig]);
 
   return (
     <div className="space-y-4">
@@ -155,7 +190,16 @@ function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footer
                   )}
                 >
                   <div className="flex items-center justify-between gap-2">
-                    <span>{col.label}</span>
+                    <div 
+                      className="flex items-center gap-1.5 cursor-pointer hover:text-blue-700 select-none"
+                      onClick={() => handleSort(col.key)}
+                    >
+                      <div className="flex flex-col">
+                        <ChevronUp className={cn("h-3 w-3", sortConfig?.key === col.key && sortConfig.direction === 'asc' ? "text-blue-600" : "text-gray-300")} />
+                        <ChevronDown className={cn("h-3 w-3 -mt-1.5", sortConfig?.key === col.key && sortConfig.direction === 'desc' ? "text-blue-600" : "text-gray-300")} />
+                      </div>
+                      <span>{col.label}</span>
+                    </div>
                     {showFilter && (
                       <button
                         onClick={(e) => {
@@ -243,7 +287,44 @@ function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footer
 const parseNumber = (val: any) => {
   if (typeof val === 'number') return val;
   if (!val) return 0;
-  return parseFloat(val.toString().replace(/,/g, '')) || 0;
+  
+  let str = val.toString().trim();
+  
+  // If string contains both . and ,
+  if (str.includes('.') && str.includes(',')) {
+    const lastDot = str.lastIndexOf('.');
+    const lastComma = str.lastIndexOf(',');
+    if (lastDot > lastComma) {
+      // 1,000.00 -> US format
+      str = str.replace(/,/g, '');
+    } else {
+      // 1.000,00 -> VN format
+      str = str.replace(/\./g, '').replace(/,/g, '.');
+    }
+  } else if (str.includes('.')) {
+    // Only dots. Could be 1.000.000 (VN) or 1000.50 (US)
+    if ((str.match(/\./g) || []).length > 1) {
+      str = str.replace(/\./g, '');
+    } else {
+      // One dot. If exactly 3 digits after it, assume VN thousands separator for VND
+      if (/\.\d{3}$/.test(str)) {
+        str = str.replace(/\./g, '');
+      }
+    }
+  } else if (str.includes(',')) {
+    // Only commas. Could be 1,000,000 (US) or 1000,50 (VN)
+    if ((str.match(/,/g) || []).length > 1) {
+      str = str.replace(/,/g, '');
+    } else {
+      if (/,\d{3}$/.test(str)) {
+        str = str.replace(/,/g, '');
+      } else {
+        str = str.replace(/,/g, '.');
+      }
+    }
+  }
+  
+  return parseFloat(str) || 0;
 };
 
 export default function App() {
