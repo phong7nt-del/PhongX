@@ -566,7 +566,10 @@ export default function App() {
   const tab1Data = useMemo(() => {
     if (!selectedGroup) return null;
 
-    const groupData = allAggregatedData.filter(item => item.NHOM === selectedGroup);
+    let groupData = allAggregatedData;
+    if (selectedGroup !== 'Công ty') {
+      groupData = allAggregatedData.filter(item => item.NHOM === selectedGroup);
+    }
 
     const sortedData = [...groupData].sort((a, b) => {
       if (a.SO_KY !== b.SO_KY) {
@@ -1550,6 +1553,7 @@ export default function App() {
                       className="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border appearance-none bg-white"
                     >
                       <option value="">-- Chọn một nhóm --</option>
+                      <option value="Công ty" className="font-bold text-blue-600">Công ty (Tất cả)</option>
                       {groups.map(g => (
                         <option key={g} value={g}>{g}</option>
                       ))}
@@ -1612,7 +1616,7 @@ export default function App() {
                           Xuất Excel
                         </button>
                       </div>
-                      {renderDetailsTable(tab1Data.details, false)}
+                      {renderDetailsTable(tab1Data.details, selectedGroup === 'Công ty')}
                     </div>
                   </div>
                 )}
