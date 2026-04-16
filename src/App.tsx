@@ -215,9 +215,21 @@ export default function App() {
   const [activeRegionTab, setActiveRegionTab] = useState<string>('Vũng Tàu');
   
   // Tab 4 Search State
+  const [activeTab4SubTab, setActiveTab4SubTab] = useState<'timKiem' | 'locTheoPhien' | 'locTheoKyHD'>('timKiem');
   const [searchQueryInput, setSearchQueryInput] = useState('');
   const [searchExactInput, setSearchExactInput] = useState(false);
   const [searchParams, setSearchParams] = useState({ query: '', exact: false, hasSearched: false });
+  
+  // Tab 4 Lọc theo phiên State
+  const [phienFilterInput, setPhienFilterInput] = useState('');
+  const [phienFilterMode, setPhienFilterMode] = useState<'group' | 'detail'>('group');
+  const [phienFilterResult, setPhienFilterResult] = useState<any[]>([]);
+  const [hasFilteredPhien, setHasFilteredPhien] = useState(false);
+
+  // Tab 4 Lọc theo kỳ HĐ State
+  const [kyHDFilterMonth, setKyHDFilterMonth] = useState<string>('');
+  const [kyHDFilterYear, setKyHDFilterYear] = useState<string>('');
+  const [selectedGroupTab4KyHD, setSelectedGroupTab4KyHD] = useState<string>('');
   
   // Phone Update State
   const [updatedPhones, setUpdatedPhones] = useState<Record<string, string>>({});
@@ -496,6 +508,62 @@ export default function App() {
     }));
   }, [tonData, searchParams, khangToNhom]);
 
+  const handleFilterPhien = () => {
+    if (!phienFilterInput.trim()) {
+      setPhienFilterResult([]);
+      setHasFilteredPhien(true);
+      return;
+    }
+
+    const query = phienFilterInput.trim().toLowerCase();
+    const queryLength = query.length;
+    
+    const filteredTonData = tonData.filter(row => {
+      const maSogcs = (row['MA_SOGCS'] || '').toString().toLowerCase();
+      return maSogcs.substring(0, queryLength) === query;
+    });
+
+    if (phienFilterMode === 'detail') {
+      const details = filteredTonData.map((row, index) => ({
+        ...row,
+        STT: index + 1,
+        NHOM: khangToNhom.get(row['MA_KHANG']) || 'Không xác định',
+        THANG_HD: row['THANG'] || row['Thang'] || row['thang'] || '',
+        NAM_HD: row['NAM'] || row['Nam'] || row['nam'] || '',
+        KY_HD: row['KY'] || row['Ky'] || row['ky'] || '',
+        DOANHSO: `${row['MA_KVUC'] || ''} - ${row['STT'] || ''}`,
+        TONG_NO: parseFloat(row['TONG_NO'] || '0') || 0
+      }));
+      setPhienFilterResult(details);
+    } else {
+      // Group mode
+      const grouped = new Map<string, any>();
+      filteredTonData.forEach(row => {
+        const maKhang = row['MA_KHANG'];
+        if (!grouped.has(maKhang)) {
+          grouped.set(maKhang, {
+            ...row,
+            SO_KY: 1,
+            TONG_NO: parseFloat(row['TONG_NO']) || 0,
+            NHOM: khangToNhom.get(maKhang) || 'Không xác định',
+            DOANHSO: `${row['MA_KVUC'] || ''} - ${row['STT'] || ''}`
+          });
+        } else {
+          const existing = grouped.get(maKhang);
+          existing.SO_KY += 1;
+          existing.TONG_NO += parseFloat(row['TONG_NO']) || 0;
+        }
+      });
+      
+      const result = Array.from(grouped.values()).map((row, index) => ({
+        ...row,
+        STT: index + 1
+      }));
+      setPhienFilterResult(result);
+    }
+    setHasFilteredPhien(true);
+  };
+
   // Process data for Tab 3 (>= 5M)
   const tab3Data = useMemo(() => {
     if (!selectedGroupTab3) return null;
@@ -576,6 +644,60 @@ export default function App() {
     };
   }, [selectedGroupTab3, allAggregatedData]);
 
+  // Process data for Tab 4 (Lọc theo kỳ HĐ)
+  const tab4KyHDData = useMemo(() => {
+    if (!selectedGroupTab4KyHD || !kyHDFilterMonth || !kyHDFilterYear) return null;
+
+    const targetMonth = parseInt(kyHDFilterMonth, 10);
+    const targetYear = parseInt(kyHDFilterYear, 10);
+
+    // Filter tonData directly to find customers with invoices matching the selected month and year
+    const matchingCustomers = new Set<string>();
+    tonData.forEach(row => {
+      const rowMonth = parseInt(row['THANG'] || row['Thang'] || row['thang'] || '0', 10);
+      const rowYear = parseInt(row['NAM'] || row['Nam'] || row['nam'] || '0', 10);
+      
+      if (rowMonth === targetMonth && rowYear === targetYear) {
+        matchingCustomers.add(row['MA_KHANG']);
+      }
+    });
+
+    let filteredData = allAggregatedData.filter(item => matchingCustomers.has(item.MA_KHANG));
+
+    if (selectedGroupTab4KyHD !== 'Công ty') {
+      filteredData = filteredData.filter(item => item.NHOM === selectedGroupTab4KyHD);
+    }
+
+    const sortedData = [...filteredData].sort((a, b) => {
+      if (a.SO_KY !== b.SO_KY) {
+        return b.SO_KY - a.SO_KY;
+      }
+      return b.TONG_NO - a.TONG_NO;
+    });
+
+    const detailedList = sortedData.map((item, index) => {
+      const stt = index + 1;
+      return {
+        STT: stt,
+        DOANHSO: `${item.MA_KVUC} - ${item.STT_TON}`,
+        ...item
+      };
+    });
+
+    const hdTon = filteredData.reduce((sum, item) => sum + item.HD_TON, 0);
+    const tongNo = filteredData.reduce((sum, item) => sum + item.TONG_NO, 0);
+
+    return {
+      summary: {
+        NHOM: selectedGroupTab4KyHD,
+        KH_TON: filteredData.length,
+        HD_TON: hdTon,
+        TONG_NO: tongNo,
+      },
+      details: detailedList
+    };
+  }, [selectedGroupTab4KyHD, allAggregatedData, tonData, kyHDFilterMonth, kyHDFilterYear]);
+
   // Process data for Tab 2 (All Groups Summary)
   const tab2Data = useMemo(() => {
     const summaryByGroup = new Map<string, { KH_TON: Set<string>, HD_TON: number, TONG_NO: number }>();
@@ -635,7 +757,7 @@ export default function App() {
       const phien = maSoGCS.substring(0, 3) || 'Khác';
       const maKhang = row['MA_KHANG'];
       const tongTien = parseFloat(row['TONG_NO'] || '0') || 0;
-      const tongThue = parseFloat(row['THUE'] || '0') || 0;
+      const tongThue = parseFloat(row['THUE_PSINH'] || '0') || 0;
       const tongVC = parseFloat(row['TIEN_VC'] || '0') || 0;
       const tongThueVC = parseFloat(row['THUE_VC'] || '0') || 0;
 
@@ -913,19 +1035,19 @@ export default function App() {
       { key: 'MA_SOGCS', label: 'Mã Sổ GCS' },
       { key: 'SO_TBI', label: 'Số TBI' },
       { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[250px]', render: (row: any) => (
-        <div className="flex items-start justify-between gap-2">
-          <span>{row.DCHI_KHANG}</span>
+        <div className="flex items-start gap-2">
           {row.DCHI_KHANG && (
             <a 
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.DCHI_KHANG)}`} 
               target="_blank" 
               rel="noopener noreferrer"
               title="Chỉ đường trên Google Maps"
-              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors"
+              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors mt-0.5"
             >
               <MapPin className="h-4 w-4" />
             </a>
           )}
+          <span>{row.DCHI_KHANG}</span>
         </div>
       )}
     ];
@@ -1058,19 +1180,19 @@ export default function App() {
       { key: 'MA_SOGCS', label: 'Mã Sổ GCS' },
       { key: 'SO_TBI', label: 'Số TBI' },
       { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[250px]', render: (row: any) => (
-        <div className="flex items-start justify-between gap-2">
-          <span>{row.DCHI_KHANG}</span>
+        <div className="flex items-start gap-2">
           {row.DCHI_KHANG && (
             <a 
               href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(row.DCHI_KHANG)}`} 
               target="_blank" 
               rel="noopener noreferrer"
               title="Chỉ đường trên Google Maps"
-              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors"
+              className="p-1.5 text-red-500 bg-red-50 hover:bg-red-100 rounded-md shrink-0 transition-colors mt-0.5"
             >
               <MapPin className="h-4 w-4" />
             </a>
           )}
+          <span>{row.DCHI_KHANG}</span>
         </div>
       )}
     ];
@@ -1140,7 +1262,7 @@ export default function App() {
       </div>
     );
 
-    return <FilterableTable data={details} columns={columns} renderMobileCard={renderMobileCard} />;
+    return <FilterableTable data={details} columns={columns} renderMobileCard={renderMobileCard} showFilter={true} />;
   };
 
   return (
@@ -1416,8 +1538,8 @@ export default function App() {
                       data={tab2Data.groups}
                       columns={[
                         { key: 'NHOM', label: 'Nhóm' },
-                        { key: 'KH_TON', label: 'Số Khách Hàng Tồn (KH_Ton)', align: 'right' },
-                        { key: 'HD_TON', label: 'Số Hóa Đơn Tồn (HD_Ton)', align: 'right' },
+                        { key: 'KH_TON', label: 'KH Tồn', align: 'right' },
+                        { key: 'HD_TON', label: 'HĐ Tồn', align: 'right' },
                         { key: 'TONG_NO', label: 'Tổng Nợ', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_NO)}</span> }
                       ]}
                       footerRow={tab2Data.total}
@@ -1428,16 +1550,16 @@ export default function App() {
                       data={tab2PhienData.data}
                       columns={[
                         { key: 'PHIEN', label: 'Phiên' },
-                        { key: 'TONG_KH', label: 'Tổng KH Tồn', align: 'right' },
-                        { key: 'TONG_HD', label: 'Tổng HĐ Tồn', align: 'right' },
-                        { key: 'TONG_TIEN', label: 'Tổng Tiền Tồn', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_TIEN)}</span> },
-                        { key: 'TONG_THUE', label: 'Tổng Thuế Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_THUE) },
-                        { key: 'TONG_VC', label: 'Tổng VC Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_VC) },
-                        { key: 'TONG_THUE_VC', label: 'Tổng Thuế VC Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_THUE_VC) },
-                        { key: 'KH_LON_HON_5M', label: 'Tổng KH > 5tr', align: 'right' },
-                        { key: 'KH_1_DEN_5M', label: 'Tổng KH 1-5tr', align: 'right' },
-                        { key: 'KH_2_HD', label: 'Tổng KH có 2 HĐ', align: 'right' },
-                        { key: 'KH_TU_3_HD', label: 'Tổng KH ≥ 3 HĐ', align: 'right' }
+                        { key: 'TONG_KH', label: 'KH Tồn', align: 'right' },
+                        { key: 'TONG_HD', label: 'HĐ Tồn', align: 'right' },
+                        { key: 'TONG_TIEN', label: 'Tiền Tồn', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_TIEN)}</span> },
+                        { key: 'TONG_THUE', label: 'Thuế Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_THUE) },
+                        { key: 'TONG_VC', label: 'VC Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_VC) },
+                        { key: 'TONG_THUE_VC', label: 'Thuế VC Tồn', align: 'right', render: (row: any) => formatCurrency(row.TONG_THUE_VC) },
+                        { key: 'KH_LON_HON_5M', label: 'KH > 5tr', align: 'right' },
+                        { key: 'KH_1_DEN_5M', label: 'KH 1-5tr', align: 'right' },
+                        { key: 'KH_2_HD', label: 'KH có 2 HĐ', align: 'right' },
+                        { key: 'KH_TU_3_HD', label: 'KH ≥ 3 HĐ', align: 'right' }
                       ]}
                       footerRow={tab2PhienData.total}
                     />
@@ -1449,70 +1571,299 @@ export default function App() {
             {/* Tab 4 Content */}
             {activeTab === 'tab4' && (
               <div className="space-y-6 animate-in fade-in duration-300">
-                <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6">
-                  <form 
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      setSearchParams({
-                        query: searchQueryInput,
-                        exact: searchExactInput,
-                        hasSearched: true
-                      });
-                    }}
-                    className="flex flex-col md:flex-row gap-4 items-end"
-                  >
-                    <div className="flex-1 w-full">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Từ khóa tìm kiếm</label>
-                      <input
-                        type="text"
-                        value={searchQueryInput}
-                        onChange={(e) => setSearchQueryInput(e.target.value)}
-                        placeholder="Nhập mã, tên hoặc địa chỉ..."
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
-                      />
-                    </div>
-                    <div className="w-full md:w-48">
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Kiểu tìm kiếm</label>
-                      <select
-                        value={searchExactInput ? 'exact' : 'partial'}
-                        onChange={(e) => setSearchExactInput(e.target.value === 'exact')}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
-                      >
-                        <option value="partial">Tìm gần đúng</option>
-                        <option value="exact">Tìm chính xác</option>
-                      </select>
-                    </div>
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                  <div className="flex space-x-1 bg-gray-200 p-1 rounded-lg mb-6 w-fit">
                     <button
-                      type="submit"
-                      className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 h-[42px]"
+                      onClick={() => setActiveTab4SubTab('timKiem')}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                        activeTab4SubTab === 'timKiem'
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      )}
                     >
-                      <Search className="h-4 w-4" />
-                      Tìm kiếm
+                      Tìm kiếm chung
                     </button>
-                  </form>
-                </div>
-
-                {searchParams.hasSearched && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-medium leading-6 text-gray-900">Kết quả tìm kiếm</h3>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {searchResults.length} bản ghi
-                        </span>
-                      </div>
-                      <button
-                        onClick={() => handleExportExcel(searchResults, `TimKiem_${searchParams.query}`)}
-                        className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
-                        disabled={searchResults.length === 0}
-                      >
-                        <Download className="h-4 w-4" />
-                        Xuất Excel
-                      </button>
-                    </div>
-                    {renderSearchTable(searchResults)}
+                    <button
+                      onClick={() => setActiveTab4SubTab('locTheoPhien')}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                        activeTab4SubTab === 'locTheoPhien'
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      )}
+                    >
+                      Lọc theo phiên
+                    </button>
+                    <button
+                      onClick={() => setActiveTab4SubTab('locTheoKyHD')}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                        activeTab4SubTab === 'locTheoKyHD'
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      )}
+                    >
+                      Lọc theo kỳ HĐ
+                    </button>
                   </div>
-                )}
+
+                  {activeTab4SubTab === 'timKiem' && (
+                    <>
+                      <form 
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          setSearchParams({
+                            query: searchQueryInput,
+                            exact: searchExactInput,
+                            hasSearched: true
+                          });
+                        }}
+                        className="flex flex-col md:flex-row gap-4 items-end"
+                      >
+                        <div className="flex-1 w-full">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Từ khóa tìm kiếm</label>
+                          <input
+                            type="text"
+                            value={searchQueryInput}
+                            onChange={(e) => setSearchQueryInput(e.target.value)}
+                            placeholder="Nhập mã, tên hoặc địa chỉ..."
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                          />
+                        </div>
+                        <div className="w-full md:w-48">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Kiểu tìm kiếm</label>
+                          <select
+                            value={searchExactInput ? 'exact' : 'partial'}
+                            onChange={(e) => setSearchExactInput(e.target.value === 'exact')}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                          >
+                            <option value="partial">Tìm gần đúng</option>
+                            <option value="exact">Tìm chính xác</option>
+                          </select>
+                        </div>
+                        <button
+                          type="submit"
+                          className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 h-[42px]"
+                        >
+                          <Search className="h-4 w-4" />
+                          Tìm kiếm
+                        </button>
+                      </form>
+
+                      {searchParams.hasSearched && (
+                        <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                          <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                              <h3 className="text-lg font-medium leading-6 text-gray-900">Kết quả tìm kiếm</h3>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {searchResults.length} bản ghi
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleExportExcel(searchResults, `TimKiem_${searchParams.query}`)}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                              disabled={searchResults.length === 0}
+                            >
+                              <Download className="h-4 w-4" />
+                              Xuất Excel
+                            </button>
+                          </div>
+                          {renderSearchTable(searchResults)}
+                        </div>
+                      )}
+                    </>
+                  )}
+
+                  {activeTab4SubTab === 'locTheoPhien' && (
+                    <>
+                      <div className="flex flex-col md:flex-row gap-4 items-end">
+                        <div className="flex-1 w-full">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Nhập hoặc chọn phiên</label>
+                          <div className="flex gap-2">
+                            <input
+                              type="text"
+                              value={phienFilterInput}
+                              onChange={(e) => setPhienFilterInput(e.target.value)}
+                              placeholder="Ví dụ: B1, B2, 20..."
+                              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow"
+                            />
+                            <select
+                              onChange={(e) => {
+                                if (e.target.value) {
+                                  setPhienFilterInput(e.target.value);
+                                }
+                              }}
+                              className="w-32 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                            >
+                              <option value="">Chọn...</option>
+                              <option value="B1">B1</option>
+                              <option value="B2">B2</option>
+                              <option value="B3">B3</option>
+                              <option value="20">20</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div className="w-full md:w-48">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Chế độ xem</label>
+                          <select
+                            value={phienFilterMode}
+                            onChange={(e) => setPhienFilterMode(e.target.value as 'group' | 'detail')}
+                            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                          >
+                            <option value="group">Group theo khách hàng</option>
+                            <option value="detail">Xem chi tiết</option>
+                          </select>
+                        </div>
+                        <button
+                          onClick={handleFilterPhien}
+                          className="w-full md:w-auto px-6 py-2 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition-colors flex items-center justify-center gap-2 h-[42px]"
+                        >
+                          <Search className="h-4 w-4" />
+                          Lọc
+                        </button>
+                      </div>
+
+                      {hasFilteredPhien && (
+                        <div className="mt-6 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                          <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                              <h3 className="text-lg font-medium leading-6 text-gray-900">
+                                Kết quả lọc phiên: {phienFilterInput} ({phienFilterMode === 'group' ? 'Group theo KH' : 'Chi tiết'})
+                              </h3>
+                              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                {phienFilterResult.length} bản ghi
+                              </span>
+                            </div>
+                            <button
+                              onClick={() => handleExportExcel(phienFilterResult, `LocPhien_${phienFilterInput}_${phienFilterMode}`)}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                              disabled={phienFilterResult.length === 0}
+                            >
+                              <Download className="h-4 w-4" />
+                              Xuất Excel
+                            </button>
+                          </div>
+                          {phienFilterMode === 'group' ? (
+                            renderDetailsTable(phienFilterResult, true)
+                          ) : (
+                            renderSearchTable(phienFilterResult)
+                          )}
+                        </div>
+                      )}
+                    </>
+                  )}
+                  {activeTab4SubTab === 'locTheoKyHD' && (
+                    <>
+                      <div className="flex gap-4 mb-4">
+                        <div className="flex-1 max-w-[200px]">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Tháng</label>
+                          <select
+                            value={kyHDFilterMonth}
+                            onChange={(e) => setKyHDFilterMonth(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                          >
+                            <option value="">Chọn tháng</option>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                              <option key={m} value={m}>Tháng {m}</option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="flex-1 max-w-[200px]">
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Năm</label>
+                          <select
+                            value={kyHDFilterYear}
+                            onChange={(e) => setKyHDFilterYear(e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none bg-white"
+                          >
+                            <option value="">Chọn năm</option>
+                            {[2023, 2024, 2025, 2026].map(y => (
+                              <option key={y} value={y}>Năm {y}</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
+                      <label htmlFor="group-select-tab4-kyhd" className="block text-sm font-medium text-gray-700 mb-2">
+                        Chọn nhóm quản lý (Lọc theo kỳ HĐ)
+                      </label>
+                      <div className="relative max-w-md mb-6">
+                        <select
+                          id="group-select-tab4-kyhd"
+                          value={selectedGroupTab4KyHD}
+                          onChange={(e) => setSelectedGroupTab4KyHD(e.target.value)}
+                          className="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border appearance-none bg-white"
+                        >
+                          <option value="">-- Chọn một nhóm --</option>
+                          <option value="Công ty" className="font-semibold text-blue-600">Công ty (Tất cả khách hàng)</option>
+                          {groups.map(g => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                          <Search className="h-4 w-4" />
+                        </div>
+                      </div>
+
+                      {selectedGroupTab4KyHD && tab4KyHDData && (
+                        <div className="space-y-6">
+                          {/* Thông tin 1: Tổng quát tồn */}
+                          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
+                              <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn (Lọc theo kỳ HĐ)</h3>
+                            </div>
+                            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                                <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
+                                <dd className="mt-2 text-2xl font-semibold text-blue-900">{tab4KyHDData.summary.NHOM}</dd>
+                              </div>
+                              <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                                <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
+                                <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
+                                  <Users className="h-5 w-5 opacity-70" />
+                                  {tab4KyHDData.summary.KH_TON}
+                                </dd>
+                              </div>
+                              <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+                                <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
+                                <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
+                                  <Receipt className="h-5 w-5 opacity-70" />
+                                  {tab4KyHDData.summary.HD_TON}
+                                </dd>
+                              </div>
+                              <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                                <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
+                                <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
+                                  {formatCurrency(tab4KyHDData.summary.TONG_NO)}
+                                </dd>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Thông tin 2: Thống kê chi tiết */}
+                          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
+                              <div className="flex items-center gap-3">
+                                <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên (Lọc theo kỳ HĐ)</h3>
+                                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                  {tab4KyHDData.details.length} bản ghi
+                                </span>
+                              </div>
+                              <button
+                                onClick={() => handleExportExcel(tab4KyHDData.details, `LocTheoKyHD_${selectedGroupTab4KyHD}`)}
+                                className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                              >
+                                <Download className="h-4 w-4" />
+                                Xuất Excel
+                              </button>
+                            </div>
+                            {renderDetailsTable(tab4KyHDData.details, selectedGroupTab4KyHD === 'Công ty')}
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             )}
 
