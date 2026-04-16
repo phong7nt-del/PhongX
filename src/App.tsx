@@ -44,6 +44,8 @@ function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footer
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
 
+  const [showMobileFilters, setShowMobileFilters] = useState(false);
+
   useEffect(() => {
     const handleClickOutside = () => setOpenFilter(null);
     document.addEventListener('click', handleClickOutside);
@@ -67,25 +69,63 @@ function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footer
         <div className="block md:hidden space-y-4">
           {/* Mobile Filters */}
           {showFilter && (
-            <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 mb-4">
-              <h4 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
-                <Search className="h-4 w-4 text-blue-500" />
-                Bộ lọc dữ liệu
-              </h4>
-              <div className="grid grid-cols-2 gap-3">
-                {columns.map(col => (
-                  <div key={col.key}>
-                    <label className="block text-xs text-gray-500 mb-1">{col.label}</label>
-                    <input
-                      type="text"
-                      className="w-full px-2 py-1.5 text-sm border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                      placeholder="Lọc..."
-                      value={filters[col.key] || ''}
-                      onChange={e => setFilters(prev => ({ ...prev, [col.key]: e.target.value }))}
-                    />
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+              <button 
+                onClick={() => setShowMobileFilters(!showMobileFilters)}
+                className="w-full px-4 py-3 flex items-center justify-between bg-gray-50 hover:bg-gray-100 transition-colors"
+              >
+                <div className="flex items-center gap-2">
+                  <Filter className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm font-medium text-gray-700">Bộ lọc dữ liệu</span>
+                  {Object.values(filters).filter(Boolean).length > 0 && (
+                    <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                      {Object.values(filters).filter(Boolean).length}
+                    </span>
+                  )}
+                </div>
+                <div className={cn("transition-transform duration-200", showMobileFilters && "rotate-180")}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-gray-500"><path d="m6 9 6 6 6-6"/></svg>
+                </div>
+              </button>
+              
+              {showMobileFilters && (
+                <div className="p-4 border-t border-gray-200 bg-white">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {columns.map(col => (
+                      <div key={col.key} className="relative">
+                        <label className="block text-xs font-medium text-gray-600 mb-1.5">{col.label}</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            className="w-full pl-3 pr-8 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-shadow bg-gray-50 focus:bg-white"
+                            placeholder={`Lọc ${col.label.toLowerCase()}...`}
+                            value={filters[col.key] || ''}
+                            onChange={e => setFilters(prev => ({ ...prev, [col.key]: e.target.value }))}
+                          />
+                          {filters[col.key] && (
+                            <button 
+                              onClick={() => setFilters(prev => ({ ...prev, [col.key]: '' }))}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
+                  {Object.values(filters).filter(Boolean).length > 0 && (
+                    <div className="mt-4 flex justify-end">
+                      <button
+                        onClick={() => setFilters({})}
+                        className="text-sm text-red-600 hover:text-red-700 font-medium"
+                      >
+                        Xóa tất cả bộ lọc
+                      </button>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
@@ -199,6 +239,12 @@ function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footer
     </div>
   );
 }
+
+const parseNumber = (val: any) => {
+  if (typeof val === 'number') return val;
+  if (!val) return 0;
+  return parseFloat(val.toString().replace(/,/g, '')) || 0;
+};
 
 export default function App() {
   const [tonData, setTonData] = useState<any[]>([]);
@@ -395,7 +441,7 @@ export default function App() {
 
     tonData.forEach(row => {
       const maKhang = row['MA_KHANG'];
-      const tongNo = parseFloat(row['TONG_NO'] || '0') || 0;
+      const tongNo = parseNumber(row['TONG_NO']);
       const nhom = khangToNhom.get(maKhang) || 'Không xác định';
       
       const nam = parseInt(row['NAM'] || row['Nam'] || row['nam'] || '0', 10);
@@ -481,22 +527,26 @@ export default function App() {
       const ma = (row['MA_KHANG'] || '').toString();
       const ten = (row['TEN_KHANG'] || '').toString();
       const dchi = (row['DCHI_KHANG'] || '').toString();
+      const maSo = (row['MA_SOGCS'] || '').toString();
       
       let matchMa = false;
       let matchTen = false;
       let matchDchi = false;
+      let matchMaSo = false;
 
       if (searchParams.exact) {
         matchMa = ma === query;
         matchTen = ten === query;
         matchDchi = dchi === query;
+        matchMaSo = maSo === query;
       } else {
         matchMa = ma.toLowerCase().includes(query);
         matchTen = ten.toLowerCase().includes(query);
         matchDchi = dchi.toLowerCase().includes(query);
+        matchMaSo = maSo.toLowerCase().includes(query);
       }
 
-      return matchMa || matchTen || matchDchi;
+      return matchMa || matchTen || matchDchi || matchMaSo;
     }).map((row, index) => ({
       ...row,
       STT: index + 1,
@@ -504,7 +554,7 @@ export default function App() {
       THANG_HD: row['THANG'] || row['Thang'] || row['thang'] || '',
       NAM_HD: row['NAM'] || row['Nam'] || row['nam'] || '',
       KY_HD: row['KY'] || row['Ky'] || row['ky'] || '',
-      TONG_NO: parseFloat(row['TONG_NO'] || '0') || 0
+      TONG_NO: parseNumber(row['TONG_NO'])
     }));
   }, [tonData, searchParams, khangToNhom]);
 
@@ -532,7 +582,7 @@ export default function App() {
         NAM_HD: row['NAM'] || row['Nam'] || row['nam'] || '',
         KY_HD: row['KY'] || row['Ky'] || row['ky'] || '',
         DOANHSO: `${row['MA_KVUC'] || ''} - ${row['STT'] || ''}`,
-        TONG_NO: parseFloat(row['TONG_NO'] || '0') || 0
+        TONG_NO: parseNumber(row['TONG_NO'])
       }));
       setPhienFilterResult(details);
     } else {
@@ -544,14 +594,14 @@ export default function App() {
           grouped.set(maKhang, {
             ...row,
             SO_KY: 1,
-            TONG_NO: parseFloat(row['TONG_NO']) || 0,
+            TONG_NO: parseNumber(row['TONG_NO']),
             NHOM: khangToNhom.get(maKhang) || 'Không xác định',
             DOANHSO: `${row['MA_KVUC'] || ''} - ${row['STT'] || ''}`
           });
         } else {
           const existing = grouped.get(maKhang);
           existing.SO_KY += 1;
-          existing.TONG_NO += parseFloat(row['TONG_NO']) || 0;
+          existing.TONG_NO += parseNumber(row['TONG_NO']);
         }
       });
       
@@ -756,10 +806,10 @@ export default function App() {
       const maSoGCS = row['MA_SOGCS'] || '';
       const phien = maSoGCS.substring(0, 3) || 'Khác';
       const maKhang = row['MA_KHANG'];
-      const tongTien = parseFloat(row['TONG_NO'] || '0') || 0;
-      const tongThue = parseFloat(row['THUE_PSINH'] || '0') || 0;
-      const tongVC = parseFloat(row['TIEN_VC'] || '0') || 0;
-      const tongThueVC = parseFloat(row['THUE_VC'] || '0') || 0;
+      const tongTien = parseNumber(row['TONG_NO']);
+      const tongThue = parseNumber(row['THUE_PSINH']);
+      const tongVC = parseNumber(row['TIEN_VC']);
+      const tongThueVC = parseNumber(row['THUE_VC']);
 
       if (!phienMap.has(phien)) {
         phienMap.set(phien, {
