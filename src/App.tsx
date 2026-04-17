@@ -1086,23 +1086,34 @@ export default function App() {
     }
   };
 
-  const getPhoneActions = (phoneStr: string) => {
-    if (!phoneStr) return null;
-    const match = phoneStr.match(/(?:\+84|0)[0-9]{8,9}/);
-    const phone = match ? match[0] : phoneStr.replace(/[^0-9+]/g, '');
-    if (!phone) return null;
+  const getPhoneActions = (phoneStr: string, onEdit?: () => void) => {
+    let phone = '';
+    if (phoneStr) {
+      const match = phoneStr.match(/(?:\+84|0)[0-9]{8,9}/);
+      phone = match ? match[0] : phoneStr.replace(/[^0-9+]/g, '');
+    }
 
     return (
-      <div className="flex items-center gap-1 mt-2">
-        <a href={`tel:${phone}`} title="Gọi điện" className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
-          <Phone className="h-3.5 w-3.5" />
-        </a>
-        <a href={`sms:${phone}`} title="Nhắn tin SMS" className="p-1.5 text-green-600 bg-green-50 hover:bg-green-100 rounded-md transition-colors">
-          <MessageSquare className="h-3.5 w-3.5" />
-        </a>
-        <a href={`https://zalo.me/${phone.replace(/^\+84/, '0')}`} target="_blank" rel="noopener noreferrer" title="Chat Zalo" className="px-2 py-1 text-xs font-bold text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors">
-          Zalo
-        </a>
+      <div className="flex items-center gap-1 mt-1.5 flex-wrap">
+        {phone && (
+          <>
+            <a href={`tel:${phone}`} title="Gọi điện" className="p-1.5 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors flex items-center justify-center">
+              <Phone className="h-3.5 w-3.5" />
+            </a>
+            <a href={`https://zalo.me/${phone.replace(/^\+84/, '0')}`} target="_blank" rel="noopener noreferrer" title="Chat Zalo" className="px-2 py-1 text-xs font-bold text-blue-500 bg-blue-50 hover:bg-blue-100 rounded-md transition-colors flex items-center justify-center">
+              Zalo
+            </a>
+          </>
+        )}
+        {onEdit && (
+          <button 
+            onClick={onEdit}
+            className="p-1.5 text-orange-600 bg-orange-50 hover:bg-orange-100 rounded-md transition-colors flex items-center justify-center"
+            title="Sửa số điện thoại"
+          >
+            <Edit2 className="h-3.5 w-3.5" />
+          </button>
+        )}
       </div>
     );
   };
@@ -1148,21 +1159,14 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <div className="group flex items-center justify-between">
+          <div className="flex items-center">
             <div>
               <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU}</div>
-              {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
-            </div>
-            <button 
-              onClick={() => {
+              {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU, () => {
                 setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
                 setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
-              }}
-              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all ml-2"
-              title="Cập nhật số điện thoại"
-            >
-              <Edit2 className="h-4 w-4" />
-            </button>
+              })}
+            </div>
           </div>
         )
       )},
@@ -1233,17 +1237,11 @@ export default function App() {
               <div>
                 <div className="text-xs text-gray-500 mb-1">Điện thoại liên hệ</div>
                 <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || 'Chưa có số'}</div>
-                {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
-              </div>
-              <button 
-                onClick={() => {
+                {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU, () => {
                   setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
                   setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
-                }}
-                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
-              >
-                <Edit2 className="h-4 w-4" /> Sửa
-              </button>
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -1293,21 +1291,14 @@ export default function App() {
             </button>
           </div>
         ) : (
-          <div className="group flex items-center justify-between">
+          <div className="flex items-center">
             <div>
               <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU}</div>
-              {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
-            </div>
-            <button 
-              onClick={() => {
+              {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU, () => {
                 setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
                 setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
-              }}
-              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md opacity-0 group-hover:opacity-100 transition-all ml-2"
-              title="Cập nhật số điện thoại"
-            >
-              <Edit2 className="h-4 w-4" />
-            </button>
+              })}
+            </div>
           </div>
         )
       )},
@@ -1379,17 +1370,11 @@ export default function App() {
               <div>
                 <div className="text-xs text-gray-500 mb-1">Điện thoại liên hệ</div>
                 <div className="font-medium text-gray-900">{updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || 'Chưa có số'}</div>
-                {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU)}
-              </div>
-              <button 
-                onClick={() => {
+                {getPhoneActions(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU, () => {
                   setEditingPhone({ maKhang: row.MA_KHANG, currentPhone: updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU });
                   setNewPhoneInput(updatedPhones[row.MA_KHANG] || row.DTHOAI_DVU || '');
-                }}
-                className="p-2 text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors flex items-center gap-1 text-sm font-medium"
-              >
-                <Edit2 className="h-4 w-4" /> Sửa
-              </button>
+                })}
+              </div>
             </div>
           )}
         </div>
