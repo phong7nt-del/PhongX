@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter, Map as MapIcon, Route } from 'lucide-react';
 import { cn } from './lib/utils';
+import RouteOptimizer from './components/RouteOptimizer';
 
 const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
 const TON_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Ton`;
@@ -366,6 +367,7 @@ export default function App() {
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
   const [statusUpdates, setStatusUpdates] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<'Mới đề nghị' | 'Đã cập nhật'>('Mới đề nghị');
+  const [showRouteOptimizer, setShowRouteOptimizer] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -1593,13 +1595,23 @@ export default function App() {
                             {tab1Data.details.length} bản ghi
                           </span>
                         </div>
-                        <button
-                          onClick={() => handleExportExcel(tab1Data.details, `ChiTietTon_${selectedGroup}`)}
-                          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
-                        >
-                          <Download className="h-4 w-4" />
-                          Xuất Excel
-                        </button>
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => setShowRouteOptimizer(true)}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-sm rounded-lg transition-colors border border-transparent"
+                            title="Lộ trình khuyến cáo di chuyển trên bản đồ"
+                          >
+                            <MapIcon className="h-4 w-4" />
+                            Lộ trình khuyến cáo
+                          </button>
+                          <button
+                            onClick={() => handleExportExcel(tab1Data.details, `ChiTietTon_${selectedGroup}`)}
+                            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
+                          >
+                            <Download className="h-4 w-4" />
+                            Xuất Excel
+                          </button>
+                        </div>
                       </div>
                       {renderDetailsTable(tab1Data.details, selectedGroup === 'Công ty')}
                     </div>
@@ -2251,6 +2263,13 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {showRouteOptimizer && (
+        <RouteOptimizer 
+          customers={activeTab === 'tab1' && tab1Data ? tab1Data.details : []} 
+          onClose={() => setShowRouteOptimizer(false)} 
+        />
+      )}
     </div>
   );
 }
