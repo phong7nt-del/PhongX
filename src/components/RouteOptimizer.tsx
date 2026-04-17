@@ -218,36 +218,37 @@ const RouteOptimizer: React.FC<RouteOptimizerProps> = ({ customers, onClose }) =
           )}
 
           {status === 'done' && (
-            <div className="absolute inset-0 flex flex-col lg:flex-row h-full w-full">
-              {/* Map View */}
-              <div className="flex-1 h-[50vh] lg:h-full border-b lg:border-b-0 lg:border-r border-gray-200 z-0 relative">
-                <MapContainer center={[10.762622, 106.660172]} zoom={13} style={{ height: '100%', width: '100%' }}>
-                  <TileLayer
-                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  {optimizedCustomers.map((pt, i) => (
-                    <Marker key={pt.customer.MA_KHANG} position={[pt.lat, pt.lon]} icon={createNumberedIcon(i + 1)}>
-                      <Popup>
-                        <div className="text-sm">
-                          <p className="font-bold text-gray-900 mb-1">{i + 1}. {pt.customer.TEN_KHANG}</p>
-                          <p className="text-gray-600 text-xs mb-1">Mã KH: {pt.customer.MA_KHANG}</p>
-                          <p className="text-red-600 font-semibold mb-2">{formatCurrency(pt.customer.TONG_NO)}</p>
-                          <p className="text-gray-500 text-xs">{pt.customer.DCHI_KHANG}</p>
-                        </div>
-                      </Popup>
-                    </Marker>
-                  ))}
-                  {routeGeometry.length > 0 && (
-                    <Polyline positions={routeGeometry} color="#3b82f6" weight={5} opacity={0.7} />
-                  )}
-                  {geocodedPoints.length > 0 && <MapUpdater points={geocodedPoints} />}
-                </MapContainer>
-              </div>
+            <div className="absolute inset-0 flex flex-row h-full w-full overflow-x-auto">
+              <div className="min-w-[800px] w-full flex flex-row h-full">
+                {/* Map View */}
+                <div className="flex-1 h-full border-r border-gray-200 z-0 relative">
+                  <MapContainer center={[10.762622, 106.660172]} zoom={13} style={{ height: '100%', width: '100%' }}>
+                    <TileLayer
+                      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    />
+                    {optimizedCustomers.map((pt, i) => (
+                      <Marker key={pt.customer.MA_KHANG} position={[pt.lat, pt.lon]} icon={createNumberedIcon(i + 1)}>
+                        <Popup>
+                          <div className="text-sm">
+                            <p className="font-bold text-gray-900 mb-1">{i + 1}. {pt.customer.TEN_KHANG}</p>
+                            <p className="text-gray-600 text-xs mb-1">Mã KH: {pt.customer.MA_KHANG}</p>
+                            <p className="text-red-600 font-semibold mb-2">{formatCurrency(pt.customer.TONG_NO)}</p>
+                            <p className="text-gray-500 text-xs">{pt.customer.DCHI_KHANG}</p>
+                          </div>
+                        </Popup>
+                      </Marker>
+                    ))}
+                    {routeGeometry.length > 0 && (
+                      <Polyline positions={routeGeometry} color="#3b82f6" weight={5} opacity={0.7} />
+                    )}
+                    {geocodedPoints.length > 0 && <MapUpdater points={geocodedPoints} />}
+                  </MapContainer>
+                </div>
 
-              {/* Sidebar List */}
-              <div className="w-full lg:w-96 h-[50vh] lg:h-full bg-white flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-10">
-                <div className="px-5 py-4 border-b border-gray-100 bg-blue-50/50">
+                {/* Sidebar List */}
+                <div className="w-[340px] md:w-96 h-full bg-white flex flex-col shadow-[-4px_0_15px_-3px_rgba(0,0,0,0.05)] z-10 shrink-0">
+                  <div className="px-5 py-4 border-b border-gray-100 bg-blue-50/50">
                   <h3 className="font-bold text-blue-900 flex items-center gap-2">
                     <Navigation className="h-5 w-5 text-blue-600" />
                     Thứ tự thu cước tối ưu nhất
@@ -294,6 +295,7 @@ const RouteOptimizer: React.FC<RouteOptimizerProps> = ({ customers, onClose }) =
                   )}
                 </div>
               </div>
+            </div>
             </div>
           )}
 

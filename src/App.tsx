@@ -1250,7 +1250,7 @@ export default function App() {
       </div>
     );
 
-    return <FilterableTable data={details} columns={columns} renderMobileCard={renderMobileCard} />;
+    return <FilterableTable data={details} columns={columns} />;
   };
 
   const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => {
@@ -1383,7 +1383,7 @@ export default function App() {
       </div>
     );
 
-    return <FilterableTable data={details} columns={columns} renderMobileCard={renderMobileCard} showFilter={true} />;
+    return <FilterableTable data={details} columns={columns} showFilter={true} />;
   };
 
   return (
