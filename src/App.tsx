@@ -1477,7 +1477,7 @@ export default function App() {
                   )}
                 >
                   <Search className={cn("h-5 w-5", activeTab === 'tab4' ? "text-orange-100" : "text-orange-500")} />
-                  Tab 4: Tìm kiếm
+                  Tab 4: Tìm kiếm và Lọc
                 </button>
                 <button
                   onClick={() => setActiveTab('tab5')}
