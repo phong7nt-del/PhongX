@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter, ChevronUp, ChevronDown } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter } from 'lucide-react';
 import { cn } from './lib/utils';
 
 const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
@@ -191,14 +191,14 @@ function FilterableTable({ data, columns, renderMobileCard, keyExtractor, footer
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div 
-                      className="flex items-center gap-1.5 cursor-pointer hover:text-blue-700 select-none"
+                      className="flex items-center gap-1.5 cursor-pointer hover:text-blue-800 select-none"
                       onClick={() => handleSort(col.key)}
                     >
-                      <div className="flex flex-col">
-                        <ChevronUp className={cn("h-3 w-3", sortConfig?.key === col.key && sortConfig.direction === 'asc' ? "text-blue-600" : "text-gray-300")} />
-                        <ChevronDown className={cn("h-3 w-3 -mt-1.5", sortConfig?.key === col.key && sortConfig.direction === 'desc' ? "text-blue-600" : "text-gray-300")} />
+                      <div className="flex flex-col text-[10px] leading-none space-y-[1px]">
+                        <span className={cn(sortConfig?.key === col.key && sortConfig.direction === 'asc' ? "text-blue-700 font-black" : "text-gray-300")}>▲</span>
+                        <span className={cn(sortConfig?.key === col.key && sortConfig.direction === 'desc' ? "text-blue-700 font-black" : "text-gray-300")}>▼</span>
                       </div>
-                      <span>{col.label}</span>
+                      <span className={cn(sortConfig?.key === col.key ? "text-blue-800" : "")}>{col.label}</span>
                     </div>
                     {showFilter && (
                       <button
