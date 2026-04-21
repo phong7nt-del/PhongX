@@ -38,9 +38,10 @@ interface FilterableTableProps {
   keyExtractor?: (row: any, index: number) => string | number;
   footerRow?: any;
   showFilter?: boolean;
+  onDataChange?: (data: any[]) => void;
 }
 
-function FilterableTable({ data, columns, keyExtractor, footerRow, showFilter = false }: FilterableTableProps) {
+function FilterableTable({ data, columns, keyExtractor, footerRow, showFilter = false, onDataChange }: FilterableTableProps) {
   const [filters, setFilters] = useState<Record<string, string>>({});
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
@@ -96,6 +97,17 @@ function FilterableTable({ data, columns, keyExtractor, footerRow, showFilter = 
 
     return result;
   }, [data, filters, sortConfig]);
+
+  const onDataChangeRef = React.useRef(onDataChange);
+  useEffect(() => {
+    onDataChangeRef.current = onDataChange;
+  }, [onDataChange]);
+
+  useEffect(() => {
+    if (onDataChangeRef.current) {
+      onDataChangeRef.current(filteredData);
+    }
+  }, [filteredData]);
 
   return (
     <div className="space-y-4">
@@ -325,9 +337,10 @@ export default function App() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'tab1' | 'tab2' | 'tab3' | 'tab4' | 'tab5'>('tab1');
   const [activeTab2SubTab, setActiveTab2SubTab] = useState<'nhom' | 'phien'>('nhom');
-  const [activeTab3SubTab, setActiveTab3SubTab] = useState<'lonHon5M' | 'noKhoDoi'>('lonHon5M');
+  const [activeTab3SubTab, setActiveTab3SubTab] = useState<'lonHon5M' | 'noKhoDoi' | 'noNhieuKy'>('lonHon5M');
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [selectedGroupTab3, setSelectedGroupTab3] = useState<string>('');
+  const [soKyMinFilter, setSoKyMinFilter] = useState<string>('2');
   const [activeRegionTab, setActiveRegionTab] = useState<string>('Vũng Tàu');
   
   // Tab 4 Search State
@@ -356,6 +369,12 @@ export default function App() {
   const [statusUpdates, setStatusUpdates] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<'Mới đề nghị' | 'Đã cập nhật'>('Mới đề nghị');
   const [showRouteOptimizer, setShowRouteOptimizer] = useState(false);
+
+  const [currentFilteredDetails, setCurrentFilteredDetails] = useState<any[] | null>(null);
+
+  useEffect(() => {
+    setCurrentFilteredDetails(null);
+  }, [activeTab, selectedGroup, selectedGroupTab3, activeTab3SubTab, selectedGroupTab4KyHD, kyHDFilterMonth, kyHDFilterYear]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -767,6 +786,55 @@ export default function App() {
       details: detailedList
     };
   }, [selectedGroupTab3, allAggregatedData]);
+
+  // Process data for Tab 3 (Nợ nhiều kỳ)
+  const tab3NoNhieuKyData = useMemo(() => {
+    if (!selectedGroupTab3) return null;
+    
+    let soKy = parseInt(soKyMinFilter, 10);
+    if (isNaN(soKy)) soKy = 1;
+
+    let filteredData = allAggregatedData.filter(item => item.SO_KY >= soKy);
+
+    if (selectedGroupTab3 !== 'Công ty') {
+      filteredData = filteredData.filter(item => item.NHOM === selectedGroupTab3);
+    }
+
+    const sortedData = [...filteredData].sort((a, b) => {
+      if (a.SO_KY !== b.SO_KY) {
+        return b.SO_KY - a.SO_KY;
+      }
+      return b.TONG_NO - a.TONG_NO;
+    });
+
+    const detailedList = sortedData.map((item, index) => {
+      const stt = index + 1;
+      return {
+        STT: stt,
+        DOANHSO: `${item.MA_KVUC} - ${item.STT_TON}`,
+        ...item
+      };
+    });
+
+    const hdTon = filteredData.reduce((sum, item) => sum + item.HD_TON, 0);
+    const tongNo = filteredData.reduce((sum, item) => sum + item.TONG_NO, 0);
+
+    return {
+      summary: {
+        NHOM: selectedGroupTab3,
+        KH_TON: filteredData.length,
+        HD_TON: hdTon,
+        TONG_NO: tongNo,
+      },
+      details: detailedList
+    };
+  }, [selectedGroupTab3, allAggregatedData, soKyMinFilter]);
+
+  const currentTab3Data = activeTab3SubTab === 'lonHon5M' 
+    ? tab3Data 
+    : activeTab3SubTab === 'noKhoDoi' 
+      ? tab3NoKhoDoiData 
+      : tab3NoNhieuKyData;
 
   // Process data for Tab 4 (Lọc theo kỳ HĐ)
   const tab4KyHDData = useMemo(() => {
@@ -1241,7 +1309,7 @@ export default function App() {
     return <FilterableTable data={details} columns={columns} />;
   };
 
-  const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => {
+    const renderDetailsTable = (details: any[], showGroupColumn: boolean = false) => {
     if (details.length === 0) {
       return (
         <div className="p-8 text-center text-gray-500 bg-white rounded-lg border border-gray-200">
@@ -1371,7 +1439,20 @@ export default function App() {
       </div>
     );
 
-    return <FilterableTable data={details} columns={columns} showFilter={true} />;
+    return <FilterableTable data={details} columns={columns} showFilter={true} onDataChange={setCurrentFilteredDetails} />;
+  };
+
+  const getDynamicSummary = (baseData: any, groupName: string) => {
+    if (!baseData) return null;
+    const source = currentFilteredDetails || baseData.details;
+    const hdTon = source.reduce((sum: number, item: any) => sum + (item.HD_TON || 1), 0);
+    const tongNo = source.reduce((sum: number, item: any) => sum + (item.TONG_NO || 0), 0);
+    return {
+      NHOM: groupName,
+      KH_TON: source.length,
+      HD_TON: hdTon,
+      TONG_NO: tongNo,
+    };
   };
 
   return (
@@ -1381,9 +1462,12 @@ export default function App() {
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center gap-4">
               <div className="bg-white p-1.5 rounded-lg shadow-sm">
-                <img src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Logo_EVN.svg/512px-Logo_EVN.svg.png" alt="EVN Logo" className="h-10 object-contain" onError={(e) => {
-                  // Fallback if image fails to load
-                  (e.target as HTMLImageElement).src = "https://evnhcmc.vn/images/logo.png";
+                <img src="/logo.jpg" alt="EVN Logo" className="h-10 object-contain" referrerPolicy="no-referrer" onError={(e) => {
+                  if ((e.target as HTMLImageElement).src.includes('/logo.jpg')) {
+                    (e.target as HTMLImageElement).src = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Logo_EVN.svg/512px-Logo_EVN.svg.png";
+                  } else {
+                    (e.target as HTMLImageElement).src = "https://evnhcmc.vn/images/logo.png";
+                  }
                 }} />
               </div>
               <div>
@@ -1539,7 +1623,9 @@ export default function App() {
                   </div>
                 </div>
 
-                {selectedGroup && tab1Data && (
+                {selectedGroup && tab1Data && (() => {
+                  const info1Summary = getDynamicSummary(tab1Data, selectedGroup) || tab1Data.summary;
+                  return (
                   <div className="space-y-6">
                     {/* Thông tin 1: Tổng quát tồn */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -1549,26 +1635,26 @@ export default function App() {
                       <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                         <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
                           <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
-                          <dd className="mt-2 text-2xl font-semibold text-blue-900">{tab1Data.summary.NHOM}</dd>
+                          <dd className="mt-2 text-2xl font-semibold text-blue-900">{info1Summary.NHOM}</dd>
                         </div>
                         <div className="bg-green-50 rounded-lg p-4 border border-green-100">
                           <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
                           <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
                             <Users className="h-5 w-5 opacity-70" />
-                            {tab1Data.summary.KH_TON}
+                            {info1Summary.KH_TON}
                           </dd>
                         </div>
                         <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
                           <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
                           <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
                             <Receipt className="h-5 w-5 opacity-70" />
-                            {tab1Data.summary.HD_TON}
+                            {info1Summary.HD_TON}
                           </dd>
                         </div>
                         <div className="bg-red-50 rounded-lg p-4 border border-red-100">
                           <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
                           <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
-                            {formatCurrency(tab1Data.summary.TONG_NO)}
+                            {formatCurrency(info1Summary.TONG_NO)}
                           </dd>
                         </div>
                       </div>
@@ -1604,7 +1690,8 @@ export default function App() {
                       {renderDetailsTable(tab1Data.details, selectedGroup === 'Công ty')}
                     </div>
                   </div>
-                )}
+                  );
+                })()}
               </div>
             )}
 
@@ -1928,37 +2015,42 @@ export default function App() {
                       {selectedGroupTab4KyHD && tab4KyHDData && (
                         <div className="space-y-6">
                           {/* Thông tin 1: Tổng quát tồn */}
-                          <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                            <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
-                              <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn (Lọc theo kỳ HĐ)</h3>
-                            </div>
-                            <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                              <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                                <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
-                                <dd className="mt-2 text-2xl font-semibold text-blue-900">{tab4KyHDData.summary.NHOM}</dd>
+                          {(() => {
+                            const dynamicSummary = getDynamicSummary(tab4KyHDData, selectedGroupTab4KyHD) || tab4KyHDData.summary;
+                            return (
+                              <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                                <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
+                                  <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn (Lọc theo kỳ HĐ)</h3>
+                                </div>
+                                <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                  <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                                    <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
+                                    <dd className="mt-2 text-2xl font-semibold text-blue-900">{dynamicSummary.NHOM}</dd>
+                                  </div>
+                                  <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                                    <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
+                                    <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
+                                      <Users className="h-5 w-5 opacity-70" />
+                                      {dynamicSummary.KH_TON}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+                                    <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
+                                    <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
+                                      <Receipt className="h-5 w-5 opacity-70" />
+                                      {dynamicSummary.HD_TON}
+                                    </dd>
+                                  </div>
+                                  <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                                    <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
+                                    <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
+                                      {formatCurrency(dynamicSummary.TONG_NO)}
+                                    </dd>
+                                  </div>
+                                </div>
                               </div>
-                              <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                                <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
-                                <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
-                                  <Users className="h-5 w-5 opacity-70" />
-                                  {tab4KyHDData.summary.KH_TON}
-                                </dd>
-                              </div>
-                              <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-                                <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
-                                <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
-                                  <Receipt className="h-5 w-5 opacity-70" />
-                                  {tab4KyHDData.summary.HD_TON}
-                                </dd>
-                              </div>
-                              <div className="bg-red-50 rounded-lg p-4 border border-red-100">
-                                <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
-                                <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
-                                  {formatCurrency(tab4KyHDData.summary.TONG_NO)}
-                                </dd>
-                              </div>
-                            </div>
-                          </div>
+                            );
+                          })()}
 
                           {/* Thông tin 2: Thống kê chi tiết */}
                           <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
@@ -2014,83 +2106,119 @@ export default function App() {
                     >
                       Khách hàng nợ khó đòi
                     </button>
+                    <button
+                      onClick={() => setActiveTab3SubTab('noNhieuKy')}
+                      className={cn(
+                        "px-4 py-2 text-sm font-medium rounded-md transition-colors",
+                        activeTab3SubTab === 'noNhieuKy'
+                          ? "bg-white text-gray-900 shadow-sm"
+                          : "text-gray-600 hover:text-gray-900 hover:bg-gray-100"
+                      )}
+                    >
+                      Khách hàng nợ nhiều kỳ
+                    </button>
                   </div>
 
-                  <label htmlFor="group-select-tab3" className="block text-sm font-medium text-gray-700 mb-2">
-                    Chọn nhóm quản lý ({activeTab3SubTab === 'lonHon5M' ? 'Khách hàng nợ ≥ 5 triệu' : 'Khách hàng nợ khó đòi'})
-                  </label>
-                  <div className="relative max-w-md">
-                    <select
-                      id="group-select-tab3"
-                      value={selectedGroupTab3}
-                      onChange={(e) => setSelectedGroupTab3(e.target.value)}
-                      className="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border appearance-none bg-white"
-                    >
-                      <option value="">-- Chọn một nhóm --</option>
-                      <option value="Công ty" className="font-semibold text-blue-600">Công ty (Tất cả khách hàng)</option>
-                      {groups.map(g => (
-                        <option key={g} value={g}>{g}</option>
-                      ))}
-                    </select>
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
-                      <Search className="h-4 w-4" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl text-left">
+                    <div>
+                      <label htmlFor="group-select-tab3" className="block text-sm font-medium text-gray-700 mb-2">
+                        Chọn nhóm quản lý ({activeTab3SubTab === 'lonHon5M' ? 'Khách hàng nợ ≥ 5 triệu' : activeTab3SubTab === 'noKhoDoi' ? 'Khách hàng nợ khó đòi' : 'Khách hàng nợ nhiều kỳ'})
+                      </label>
+                      <div className="relative">
+                        <select
+                          id="group-select-tab3"
+                          value={selectedGroupTab3}
+                          onChange={(e) => setSelectedGroupTab3(e.target.value)}
+                          className="block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border appearance-none bg-white"
+                        >
+                          <option value="">-- Chọn một nhóm --</option>
+                          <option value="Công ty" className="font-semibold text-blue-600">Công ty (Tất cả khách hàng)</option>
+                          {groups.map(g => (
+                            <option key={g} value={g}>{g}</option>
+                          ))}
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-500">
+                          <Search className="h-4 w-4" />
+                        </div>
+                      </div>
                     </div>
+
+                    {activeTab3SubTab === 'noNhieuKy' && (
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                          Số kỳ (Hóa đơn tồn) tối thiểu
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={soKyMinFilter}
+                          onChange={e => setSoKyMinFilter(e.target.value)}
+                          className="block w-full px-3 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border"
+                          placeholder="Nhập số kỳ (ví dụ: 2)"
+                        />
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                {selectedGroupTab3 && (activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData) && (
+                {selectedGroupTab3 && currentTab3Data && (
                   <div className="space-y-6">
                     {/* Thông tin 1: Tổng quát tồn */}
-                    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                      <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
-                        <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn ({activeTab3SubTab === 'lonHon5M' ? '≥ 5 triệu' : 'Nợ khó đòi'})</h3>
-                      </div>
-                      <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                        <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
-                          <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
-                          <dd className="mt-2 text-2xl font-semibold text-blue-900">{(activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.summary.NHOM}</dd>
+                    {(() => {
+                      const dynamicSummary = getDynamicSummary(currentTab3Data, selectedGroupTab3) || currentTab3Data.summary;
+                      return (
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                          <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50">
+                            <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 1: Tổng quát tồn ({activeTab3SubTab === 'lonHon5M' ? '≥ 5 triệu' : activeTab3SubTab === 'noKhoDoi' ? 'Nợ khó đòi' : `Nợ ≥ ${soKyMinFilter} kỳ`})</h3>
+                          </div>
+                          <div className="p-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                            <div className="bg-blue-50 rounded-lg p-4 border border-blue-100">
+                              <dt className="text-sm font-medium text-blue-800 truncate">Nhóm</dt>
+                              <dd className="mt-2 text-2xl font-semibold text-blue-900">{dynamicSummary.NHOM}</dd>
+                            </div>
+                            <div className="bg-green-50 rounded-lg p-4 border border-green-100">
+                              <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
+                              <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
+                                <Users className="h-5 w-5 opacity-70" />
+                                {dynamicSummary.KH_TON}
+                              </dd>
+                            </div>
+                            <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
+                              <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
+                              <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
+                                <Receipt className="h-5 w-5 opacity-70" />
+                                {dynamicSummary.HD_TON}
+                              </dd>
+                            </div>
+                            <div className="bg-red-50 rounded-lg p-4 border border-red-100">
+                              <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
+                              <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
+                                {formatCurrency(dynamicSummary.TONG_NO)}
+                              </dd>
+                            </div>
+                          </div>
                         </div>
-                        <div className="bg-green-50 rounded-lg p-4 border border-green-100">
-                          <dt className="text-sm font-medium text-green-800 truncate">Số Khách Hàng Tồn</dt>
-                          <dd className="mt-2 text-2xl font-semibold text-green-900 flex items-center gap-2">
-                            <Users className="h-5 w-5 opacity-70" />
-                            {(activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.summary.KH_TON}
-                          </dd>
-                        </div>
-                        <div className="bg-purple-50 rounded-lg p-4 border border-purple-100">
-                          <dt className="text-sm font-medium text-purple-800 truncate">Số Hóa Đơn Tồn</dt>
-                          <dd className="mt-2 text-2xl font-semibold text-purple-900 flex items-center gap-2">
-                            <Receipt className="h-5 w-5 opacity-70" />
-                            {(activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.summary.HD_TON}
-                          </dd>
-                        </div>
-                        <div className="bg-red-50 rounded-lg p-4 border border-red-100">
-                          <dt className="text-sm font-medium text-red-800 truncate">Tổng Tiền</dt>
-                          <dd className="mt-2 text-2xl font-semibold text-red-900 flex items-center gap-2">
-                            {formatCurrency((activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.summary.TONG_NO)}
-                          </dd>
-                        </div>
-                      </div>
-                    </div>
+                      );
+                    })()}
 
                     {/* Thông tin 2: Thống kê chi tiết */}
                     <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                       <div className="px-6 py-5 border-b border-gray-200 bg-gray-50/50 flex justify-between items-center">
                         <div className="flex items-center gap-3">
-                          <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên ({activeTab3SubTab === 'lonHon5M' ? '≥ 5 triệu' : 'Nợ khó đòi'})</h3>
+                          <h3 className="text-lg font-medium leading-6 text-gray-900">Thông tin 2: Chi tiết tồn của nhân viên ({activeTab3SubTab === 'lonHon5M' ? '≥ 5 triệu' : activeTab3SubTab === 'noKhoDoi' ? 'Nợ khó đòi' : `Nợ ≥ ${soKyMinFilter} kỳ`})</h3>
                           <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                            {(activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.details.length} bản ghi
+                            {currentTab3Data.details.length} bản ghi
                           </span>
                         </div>
                         <button
-                          onClick={() => handleExportExcel((activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.details, activeTab3SubTab === 'lonHon5M' ? `KhachHangTren5Trieu_${selectedGroupTab3}` : `KhachHangNoKhoDoi_${selectedGroupTab3}`)}
+                          onClick={() => handleExportExcel(currentTab3Data.details, activeTab3SubTab === 'lonHon5M' ? `KhachHangTren5Trieu_${selectedGroupTab3}` : activeTab3SubTab === 'noKhoDoi' ? `KhachHangNoKhoDoi_${selectedGroupTab3}` : `KhachHangNoNhieuKy_${selectedGroupTab3}`)}
                           className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-green-700 bg-green-50 hover:bg-green-100 rounded-lg transition-colors border border-green-200"
                         >
                           <Download className="h-4 w-4" />
                           Xuất Excel
                         </button>
                       </div>
-                      {renderDetailsTable((activeTab3SubTab === 'lonHon5M' ? tab3Data : tab3NoKhoDoiData)!.details, selectedGroupTab3 === 'Công ty')}
+                      {renderDetailsTable(currentTab3Data.details, selectedGroupTab3 === 'Công ty')}
                     </div>
                   </div>
                 )}
