@@ -1459,19 +1459,21 @@ export default function App() {
     <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
       <header className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 shadow-lg border-b border-blue-950 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-20">
-            <div className="flex items-center gap-4">
-              <div className="bg-white p-1.5 rounded-lg shadow-sm flex items-center justify-center">
-                <img src="https://kinhdoanh.hcmpc.com.vn/dieuhanh/Images/logoEVNHCMPC.png" alt="EVN Logo" className="h-10 object-contain" referrerPolicy="no-referrer" onError={(e) => {
+          <div className="flex justify-between items-center py-3 min-h-[5rem]">
+            <div className="flex-1 flex flex-col items-start gap-1">
+              <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm inline-flex items-center justify-center">
+                <img src="https://kinhdoanh.hcmpc.com.vn/dieuhanh/Images/logoEVNHCMPC.png" alt="EVN Logo" className="h-8 md:h-9 object-contain" referrerPolicy="no-referrer" onError={(e) => {
                   (e.target as HTMLImageElement).src = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Logo_EVN.svg/512px-Logo_EVN.svg.png";
                 }} />
               </div>
-              <div>
-                <h1 className="text-2xl font-bold text-white tracking-tight drop-shadow-sm">Hệ Thống Quản Lý Tồn Nợ</h1>
-                <p className="text-blue-200 text-sm font-medium mt-0.5">Công ty Điện lực Vũng Tàu</p>
-              </div>
+              <div className="text-blue-100 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap tracking-wide uppercase">Công ty Điện lực Vũng Tàu</div>
             </div>
-            <div className="hidden md:block text-right">
+            
+            <div className="flex-shrink-0 px-2 sm:px-4 text-center">
+              <h1 className="text-base sm:text-xl md:text-2xl font-bold text-white tracking-tight drop-shadow-sm uppercase">Hệ Thống Quản Lý Tồn Nợ</h1>
+            </div>
+
+            <div className="flex-1 hidden md:flex flex-col items-end">
               <div className="text-blue-100 font-medium text-sm">Nguyễn Thành Phong - Đội QLTG</div>
               <div className="text-blue-300 text-xs mt-0.5 font-mono">Version: 2026.4.1</div>
             </div>
