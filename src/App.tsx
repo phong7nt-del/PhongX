@@ -1461,13 +1461,9 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-20">
             <div className="flex items-center gap-4">
-              <div className="bg-white p-1.5 rounded-lg shadow-sm">
-                <img src="/logo.jpg" alt="EVN Logo" className="h-10 object-contain" referrerPolicy="no-referrer" onError={(e) => {
-                  if ((e.target as HTMLImageElement).src.includes('/logo.jpg')) {
-                    (e.target as HTMLImageElement).src = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Logo_EVN.svg/512px-Logo_EVN.svg.png";
-                  } else {
-                    (e.target as HTMLImageElement).src = "https://evnhcmc.vn/images/logo.png";
-                  }
+              <div className="bg-white p-1.5 rounded-lg shadow-sm flex items-center justify-center">
+                <img src="https://kinhdoanh.hcmpc.com.vn/dieuhanh/Images/logoEVNHCMPC.png" alt="EVN Logo" className="h-10 object-contain" referrerPolicy="no-referrer" onError={(e) => {
+                  (e.target as HTMLImageElement).src = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Logo_EVN.svg/512px-Logo_EVN.svg.png";
                 }} />
               </div>
               <div>
