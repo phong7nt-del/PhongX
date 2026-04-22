@@ -1186,7 +1186,7 @@ export default function App() {
     }
 
     const columns: ColumnDef[] = [
-      { key: 'STT', label: 'STT' },
+      { key: 'STT', label: 'STT', minWidth: 'w-[1%] whitespace-nowrap' },
       { key: 'NHOM', label: 'Nhóm' },
       { key: 'MA_KHANG', label: 'Mã Khách', render: (row: any) => <span className="text-blue-600 font-medium">{row.MA_KHANG}</span> },
       { key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' },
@@ -1228,7 +1228,7 @@ export default function App() {
           </div>
         )
       )},
-      { key: 'MA_SOGCS', label: 'Mã Sổ GCS' },
+      { key: 'MA_SOGCS', label: 'Mã Sổ GCS', minWidth: 'w-[1%] whitespace-nowrap' },
       { key: 'SO_TBI', label: 'Số TBI' },
       { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[250px]', render: (row: any) => (
         <div className="flex items-start gap-2">
@@ -1319,12 +1319,12 @@ export default function App() {
     }
 
     const columns: ColumnDef[] = [
-      { key: 'STT', label: 'STT' },
-      { key: 'DOANHSO', label: 'Doanh số' },
+      { key: 'STT', label: 'STT', minWidth: 'w-[1%] whitespace-nowrap' },
+      { key: 'DOANHSO', label: 'Doanh số', minWidth: 'w-[1%] whitespace-nowrap' },
       ...(showGroupColumn ? [{ key: 'NHOM', label: 'Nhóm' }] : []),
       { key: 'MA_KHANG', label: 'Mã Khách', render: (row: any) => <span className="text-blue-600 font-medium">{row.MA_KHANG}</span> },
       { key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' },
-      { key: 'SO_KY', label: 'Số Kỳ', align: 'right' },
+      { key: 'SO_KY', label: 'Số Kỳ', align: 'right', minWidth: 'w-[1%] whitespace-nowrap' },
       { key: 'TONG_NO', label: 'Tổng Nợ', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_NO)}</span> },
       { key: 'DTHOAI_DVU', label: 'Điện Thoại', render: (row: any) => (
         editingPhone?.maKhang === row.MA_KHANG ? (
@@ -1360,7 +1360,7 @@ export default function App() {
           </div>
         )
       )},
-      { key: 'MA_SOGCS', label: 'Mã Sổ GCS' },
+      { key: 'MA_SOGCS', label: 'Mã Sổ GCS', minWidth: 'w-[1%] whitespace-nowrap' },
       { key: 'SO_TBI', label: 'Số TBI' },
       { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[250px]', render: (row: any) => (
         <div className="flex items-start gap-2">
@@ -2300,7 +2300,7 @@ export default function App() {
                               <FilterableTable
                                 data={items.map((item, idx) => ({ ...item, STT: idx + 1 }))}
                                 columns={[
-                                  { key: 'STT', label: 'STT' },
+                                  { key: 'STT', label: 'STT', minWidth: 'w-[1%] whitespace-nowrap text-center' },
                                   { key: 'MA_KHANG', label: 'Mã Khách', render: (row: any) => <span className="text-blue-600 font-medium">{row.MA_KHANG}</span> },
                                   { key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' },
                                   { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[300px]' },
