@@ -901,7 +901,7 @@ export default function App() {
     tonData.forEach(row => {
       const maKhang = row['MA_KHANG'];
       const nhom = khangToNhom.get(maKhang);
-      const tongNo = parseFloat(row['TONG_NO'] || '0') || 0;
+      const tongNo = parseNumber(row['TONG_NO']);
       
       if (nhom && summaryByGroup.has(nhom)) {
         const groupStat = summaryByGroup.get(nhom)!;
