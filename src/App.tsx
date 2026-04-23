@@ -1483,9 +1483,27 @@ export default function App() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-64 gap-4">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-            <p className="text-gray-500">Đang tải dữ liệu từ Google Sheets...</p>
+          <div className="w-full space-y-6 mt-2 animate-pulse">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              {[1, 2, 3, 4].map(i => (
+                <div key={i} className="h-[104px] bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col justify-center">
+                  <div className="h-4 bg-gray-200 rounded-full w-2/3 mb-3"></div>
+                  <div className="h-8 bg-gray-200 rounded-full w-1/3"></div>
+                </div>
+              ))}
+            </div>
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 max-h-[600px] overflow-hidden">
+              <div className="flex gap-4 border-b border-gray-100 pb-4 mb-6">
+                {[1, 2, 3, 4, 5].map(i => (
+                  <div key={i} className="h-10 bg-gray-200 rounded-lg w-28"></div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                  <div key={i} className="h-12 bg-gray-100/80 rounded-xl w-full"></div>
+                ))}
+              </div>
+            </div>
           </div>
         ) : error ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-6 flex items-start gap-4">
