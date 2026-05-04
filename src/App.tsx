@@ -550,7 +550,22 @@ export default function App() {
         existing.TONG_NO += tongNo;
         existing.HD_TON += 1;
         if (isOldDebt) existing.hasOldDebt = true;
+        
+        const absDate = nam * 12 + thang;
+        if (absDate > 0) {
+          if (absDate < existing.MIN_ABS || existing.MIN_ABS === 0) {
+            existing.MIN_ABS = absDate;
+            existing.MIN_THANG = thang;
+            existing.MIN_NAM = nam;
+          }
+          if (absDate > existing.MAX_ABS) {
+            existing.MAX_ABS = absDate;
+            existing.MAX_THANG = thang;
+            existing.MAX_NAM = nam;
+          }
+        }
       } else {
+        const absDate = nam * 12 + thang;
         aggregated.set(maKhang, {
           MA_KVUC: row['MA_KVUC'] || '',
           STT_TON: row['STT'] || '',
@@ -564,7 +579,13 @@ export default function App() {
           MA_SOGCS: row['MA_SOGCS'] || '',
           SO_TBI: row['SO_TBI'] || '',
           DCHI_KHANG: row['DCHI_KHANG'] || '',
-          hasOldDebt: isOldDebt
+          hasOldDebt: isOldDebt,
+          MIN_THANG: thang,
+          MIN_NAM: nam,
+          MAX_THANG: thang,
+          MAX_NAM: nam,
+          MIN_ABS: absDate,
+          MAX_ABS: absDate
         });
       }
     });
@@ -1377,7 +1398,19 @@ export default function App() {
           )}
           <span>{row.DCHI_KHANG}</span>
         </div>
-      )}
+      )},
+      { key: 'TU_THANG', label: 'Từ tháng', align: 'right', minWidth: 'w-[1%] whitespace-nowrap', render: (row: any) => (
+        <span className="text-gray-500 whitespace-nowrap text-xs">{row.SO_KY > 1 && row.MIN_THANG ? row.MIN_THANG : '-'}</span>
+      ) },
+      { key: 'TU_NAM', label: 'Từ năm', align: 'right', minWidth: 'w-[1%] whitespace-nowrap', render: (row: any) => (
+        <span className="text-gray-500 whitespace-nowrap text-xs">{row.SO_KY > 1 && row.MIN_NAM ? row.MIN_NAM : '-'}</span>
+      ) },
+      { key: 'DEN_THANG', label: 'Đến tháng', align: 'right', minWidth: 'w-[1%] whitespace-nowrap', render: (row: any) => (
+        <span className="text-gray-500 whitespace-nowrap text-xs">{row.SO_KY > 1 && row.MAX_THANG ? row.MAX_THANG : '-'}</span>
+      ) },
+      { key: 'DEN_NAM', label: 'Đến năm', align: 'right', minWidth: 'w-[1%] whitespace-nowrap', render: (row: any) => (
+        <span className="text-gray-500 whitespace-nowrap text-xs">{row.SO_KY > 1 && row.MAX_NAM ? row.MAX_NAM : '-'}</span>
+      ) }
     ];
 
     const renderMobileCard = (row: any, idx: number) => (
