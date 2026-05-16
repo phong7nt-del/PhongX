@@ -934,6 +934,7 @@ export default function App() {
 
     const result = Array.from(summaryByGroup.entries()).map(([nhom, stats]) => ({
       NHOM: nhom,
+      KHUVUC: nhomToKhuVuc.get(nhom) || 'Chưa xác định',
       KH_TON: stats.KH_TON.size,
       HD_TON: stats.HD_TON,
       TONG_NO: stats.TONG_NO
@@ -941,10 +942,11 @@ export default function App() {
 
     const total = result.reduce((acc, curr) => ({
       NHOM: 'TỔNG CỘNG',
+      KHUVUC: '',
       KH_TON: acc.KH_TON + curr.KH_TON,
       HD_TON: acc.HD_TON + curr.HD_TON,
       TONG_NO: acc.TONG_NO + curr.TONG_NO
-    }), { NHOM: 'TỔNG CỘNG', KH_TON: 0, HD_TON: 0, TONG_NO: 0 });
+    }), { NHOM: 'TỔNG CỘNG', KHUVUC: '', KH_TON: 0, HD_TON: 0, TONG_NO: 0 });
 
     return {
       groups: result,
@@ -1794,6 +1796,7 @@ export default function App() {
                       data={tab2Data.groups}
                       columns={[
                         { key: 'NHOM', label: 'Nhóm' },
+                        { key: 'KHUVUC', label: 'Khu vực' },
                         { key: 'KH_TON', label: 'KH Tồn', align: 'right' },
                         { key: 'HD_TON', label: 'HĐ Tồn', align: 'right' },
                         { key: 'TONG_NO', label: 'Tổng Nợ', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_NO)}</span> }
