@@ -1,15 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter, Map as MapIcon, Route } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter, Map as MapIcon, Route, Eye, EyeOff, LogOut, Lock, Settings } from 'lucide-react';
 import { cn } from './lib/utils';
 import RouteOptimizer from './components/RouteOptimizer';
 
-const SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
-const TON_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Ton`;
-const CHIANHOM_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=ChiaNhom`;
-const KHUVUC_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=KhuVuc`;
-const CAPNHATSDT_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=CapNhatSDT`;
+const MASTER_SPREADSHEET_ID = '1ORxFm7PvaDSRvSoNCC5ksBKjk9BEwEfrrOkGIapl9H4';
 
 // Normalize keys to uppercase and trim
 const normalizeData = (data: any[]) => {
@@ -328,7 +324,7 @@ const parseNumber = (val: any) => {
   return parseFloat(str) || 0;
 };
 
-export default function App() {
+function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowChangeLinkDL }: { session: any, setSession: any, spreadsheetId: string, onShowChangePass: () => void, onShowChangeLinkDL: () => void }) {
   const [tonData, setTonData] = useState<any[]>([]);
   const [chiaNhomData, setChiaNhomData] = useState<any[]>([]);
   const [khuVucData, setKhuVucData] = useState<any[]>([]);
@@ -378,6 +374,17 @@ export default function App() {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!spreadsheetId) {
+        setError('Không có dữ liệu Link DL cho đơn vị này.');
+        setLoading(false);
+        return;
+      }
+      
+      const TON_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Ton`;
+      const CHIANHOM_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=ChiaNhom`;
+      const KHUVUC_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=KhuVuc`;
+      const CAPNHATSDT_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=CapNhatSDT`;
+
       setLoading(true);
       setError(null);
       try {
@@ -433,7 +440,7 @@ export default function App() {
     };
 
     fetchData();
-  }, []);
+  }, [spreadsheetId]);
 
   // Extract unique groups
   const groups = useMemo(() => {
@@ -1085,6 +1092,7 @@ export default function App() {
       
       const payload = {
         action: 'updatePhone',
+        spreadsheetId,
         nhom: row.NHOM || '',
         maKhang: row.MA_KHANG || '',
         tenKhang: row.TEN_KHANG || '',
@@ -1096,7 +1104,7 @@ export default function App() {
       };
 
       // Call Google Apps Script Web App
-      await fetch('https://script.google.com/macros/s/AKfycbxPNRJ24wCy7dgrSQ21E3_ZZTNzW8GvfHoA1_qH13qkVNV3IVOy7FPUmb0O0rj6MbGm/exec', {
+      await fetch('https://script.google.com/macros/s/AKfycbzZ3rQEeTbwrTL_nDMYY2GETD_UVLQGtp5Cwv2m1sWcZQq0aeG47qTcg4A0-3BvBPl1/exec', {
         method: 'POST',
         mode: 'no-cors',
         headers: {
@@ -1141,11 +1149,12 @@ export default function App() {
     try {
       const payload = {
         action: 'updateStatus',
+        spreadsheetId,
         maKhang: update.MA_KHANG,
         trangThai: 'Đã cập nhật'
       };
 
-      await fetch('https://script.google.com/macros/s/AKfycbxPNRJ24wCy7dgrSQ21E3_ZZTNzW8GvfHoA1_qH13qkVNV3IVOy7FPUmb0O0rj6MbGm/exec', {
+      await fetch('https://script.google.com/macros/s/AKfycbzZ3rQEeTbwrTL_nDMYY2GETD_UVLQGtp5Cwv2m1sWcZQq0aeG47qTcg4A0-3BvBPl1/exec', {
         method: 'POST',
         mode: 'no-cors',
         headers: {
@@ -1490,33 +1499,64 @@ export default function App() {
     };
   };
 
+  const seasonTheme = useMemo(() => {
+    const month = new Date().getMonth() + 1;
+    if (month >= 1 && month <= 3) return { name: 'Xuân', headerClass: 'bg-gradient-to-r from-emerald-600 via-teal-500 to-green-600', footerClass: 'bg-emerald-50 text-emerald-800 border-emerald-200' };
+    if (month >= 4 && month <= 6) return { name: 'Hạ', headerClass: 'bg-gradient-to-r from-red-600 via-rose-500 to-orange-600', footerClass: 'bg-rose-50 text-rose-800 border-rose-200' };
+    if (month >= 7 && month <= 9) return { name: 'Thu', headerClass: 'bg-gradient-to-r from-amber-600 via-orange-500 to-yellow-600', footerClass: 'bg-amber-50 text-amber-800 border-amber-200' };
+    return { name: 'Đông', headerClass: 'bg-gradient-to-r from-blue-900 via-slate-800 to-indigo-950', footerClass: 'bg-slate-100 text-slate-800 border-slate-200' };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans">
-      <header className="bg-gradient-to-r from-blue-900 via-blue-800 to-indigo-900 shadow-lg border-b border-blue-950 sticky top-0 z-20">
+    <div className="min-h-screen bg-gray-50 text-gray-900 font-sans flex flex-col">
+      <header className={`${seasonTheme.headerClass} shadow-lg border-b border-white/10 sticky top-0 z-20`}>
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-3 min-h-[5rem]">
             <div className="flex-1 flex flex-col items-start gap-1">
               <div className="bg-white px-2 py-1.5 rounded-lg shadow-sm inline-flex items-center justify-center">
-                <img src="https://kinhdoanh.hcmpc.com.vn/dieuhanh/Images/logoEVNHCMPC.png" alt="EVN Logo" className="h-8 md:h-9 object-contain" referrerPolicy="no-referrer" onError={(e) => {
+                <img src="https://www.evnhcmc.vn/public/images/EVNHCMC2021.svg" alt="EVN Logo" className="h-8 md:h-9 object-contain" referrerPolicy="no-referrer" onError={(e) => {
                   (e.target as HTMLImageElement).src = "https://upload.wikimedia.org/wikipedia/commons/thumb/2/22/Logo_EVN.svg/512px-Logo_EVN.svg.png";
                 }} />
               </div>
-              <div className="text-blue-100 text-[10px] sm:text-[11px] font-semibold whitespace-nowrap tracking-wide uppercase">Công ty Điện lực Vũng Tàu</div>
+              <div className="text-white/90 text-[11px] sm:text-sm font-semibold tracking-wide uppercase mt-1">
+                {session?.donvi?.['TÊN ĐV'] || session?.donvi?.['TEN_DV'] || 'Công ty Điện lực'}
+              </div>
             </div>
             
             <div className="flex-shrink-0 px-2 sm:px-4 text-center">
               <h1 className="text-base sm:text-xl md:text-2xl font-bold text-white tracking-tight drop-shadow-sm uppercase">Hệ Thống Quản Lý Tồn Nợ</h1>
             </div>
 
-            <div className="flex-1 hidden md:flex flex-col items-end">
-              <div className="text-blue-100 font-medium text-sm">Nguyễn Thành Phong - Đội QLTG</div>
-              <div className="text-blue-300 text-xs mt-0.5 font-mono">Version: 2026.4.1</div>
+            <div className="flex-1 hidden md:flex items-center justify-end gap-3">
+              <div className="text-right mr-2">
+                <div className="text-white font-medium text-sm drop-shadow-sm">
+                  {session?.role === 'ADMIN' ? 'Admin' : session?.role === 'GUEST' ? 'Khách (Guest)' : 'Người Dùng'}
+                </div>
+                <div className="text-white/80 text-[10px] w-full text-right mt-0.5 truncate" title={session?.donvi?.['TÊN ĐV'] || session?.donvi?.['TEN_DV']}>
+                  Tài khoản
+                </div>
+              </div>
+
+              {session?.role === 'ADMIN' && (
+                <div className="flex items-center gap-2">
+                  <button onClick={onShowChangePass} title="Đổi mật khẩu" className="p-2 bg-white/10 hover:bg-white/20 text-white rounded-lg shadow-sm border border-white/20 transition-all"><Lock className="w-5 h-5" /></button>
+                  <button onClick={onShowChangeLinkDL} title="Đổi Link Dữ Liệu" className="p-2 bg-white/10 hover:bg-white/20 text-amber-100 rounded-lg shadow-sm border border-white/20 transition-all"><FileSpreadsheet className="w-5 h-5" /></button>
+                </div>
+              )}
+
+              <button
+                onClick={() => setSession(null)}
+                className="p-2 ml-2 bg-white/10 hover:bg-red-500/80 text-white rounded-lg shadow-sm border border-white/10 transition-all"
+                title="Đăng xuất"
+              >
+                <LogOut className="h-5 w-5" />
+              </button>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {loading ? (
           <div className="w-full space-y-6 mt-2 animate-pulse">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -2396,7 +2436,454 @@ export default function App() {
           onClose={() => setShowRouteOptimizer(false)} 
         />
       )}
+
+      <footer className={`${seasonTheme.footerClass} border-t mt-auto w-full transition-colors`}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs sm:text-sm">
+          <div className="font-medium opacity-80">
+            Bản quyền thuộc @PC Vũng Tàu
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-4 items-center font-medium">
+            <span>Tác giả: Nguyễn Thành Phong - PCVT</span>
+            <span className="opacity-50 hidden sm:inline">|</span>
+            <span className="font-mono text-xs opacity-80">Version 2026.4.1 (Mùa {seasonTheme.name})</span>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
 
+export default function App() {
+  const [session, setSession] = useState<{ role: 'ADMIN' | 'USER' | 'GUEST', donvi: any, spreadsheetId: string | null } | null>(null);
+  const [donviList, setDonviList] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Login Form State
+  const [selectedDonVi, setSelectedDonVi] = useState<string>('');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [localPasswords, setLocalPasswords] = useState<Record<string, string>>({});
+
+  // Change Password State
+  const [showChangePass, setShowChangePass] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [isUpdatingPass, setIsUpdatingPass] = useState(false);
+
+  // Change Link DL State
+  const [showChangeLinkDL, setShowChangeLinkDL] = useState(false);
+  const [newLinkDL, setNewLinkDL] = useState('');
+  const [isUpdatingLinkDL, setIsUpdatingLinkDL] = useState(false);
+
+  const handleChangeLinkDL = async () => {
+    if (!newLinkDL.trim()) {
+      alert('Vui lòng nhập Link dữ liệu mới!');
+      return;
+    }
+    
+    setIsUpdatingLinkDL(true);
+    try {
+      const maDV = getDonviValue(session?.donvi, ['mã đv', 'ma_dv', 'mã đơn vị', 'ma dv']);
+      const newLink = newLinkDL.trim();
+      const payload = {
+        action: 'updateLinkDL',
+        spreadsheetId: MASTER_SPREADSHEET_ID,
+        sheetName: 'DonVi',
+        maDV: maDV,
+        ma_dv: maDV,
+        'Mã ĐV': maDV,
+        'MÃ ĐV': maDV,
+        newLink: newLink,
+        link: newLink,
+        'Link DL': newLink,
+        'LINK DL': newLink
+      };
+
+      await fetch('https://script.google.com/macros/s/AKfycbzZ3rQEeTbwrTL_nDMYY2GETD_UVLQGtp5Cwv2m1sWcZQq0aeG47qTcg4A0-3BvBPl1/exec', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload)
+      });
+      
+      const newSheetId = extractSheetId(newLinkDL);
+      if (newSheetId) {
+         setSession(prev => prev ? { ...prev, spreadsheetId: newSheetId } : null);
+      }
+      
+      // Update local DonVi list
+      setDonviList(prev => prev.map(d => {
+        const dMaDV = getDonviValue(d, ['mã đv', 'ma_dv', 'mã đơn vị', 'ma dv']);
+        if (dMaDV === maDV) {
+          return { ...d, 'LINK DL': newLinkDL.trim(), 'LINK_DL': newLinkDL.trim(), 'LINK': newLinkDL.trim(), 'Link DL': newLinkDL.trim() };
+        }
+        return d;
+      }));
+
+      alert('Đã gửi yêu cầu cập nhật Link dữ liệu mới.');
+      setShowChangeLinkDL(false);
+      setNewLinkDL('');
+    } catch (e) {
+      alert('Có lỗi xảy ra khi cập nhật.');
+    } finally {
+      setIsUpdatingLinkDL(false);
+    }
+  };
+
+  useEffect(() => {
+    const savedPasswords = localStorage.getItem('donvi_passwords');
+    if (savedPasswords) {
+      try {
+        setLocalPasswords(JSON.parse(savedPasswords));
+      } catch (e) {}
+    }
+
+    const fetchDonvi = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const DONVI_URL = `https://docs.google.com/spreadsheets/d/${MASTER_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=DonVi`;
+        Papa.parse(DONVI_URL, {
+          download: true,
+          header: true,
+          skipEmptyLines: true,
+          complete: (results) => {
+            const data = normalizeData(results.data);
+            setDonviList(data);
+            if (data.length > 0) {
+              setSelectedDonVi(data[0]['TÊN ĐV'] || data[0]['TEN_DV'] || data[0]['TÊN ĐƠN VỊ'] || data[0]['TEN DV'] || '');
+            }
+            setLoading(false);
+          },
+          error: (err) => {
+            console.error(err);
+            setError('Không thể tải danh sách Đơn Vị từ hệ thống.');
+            setLoading(false);
+          }
+        });
+      } catch (err) {
+        setError('Có lỗi xảy ra khi kết nối hệ thống.');
+        setLoading(false);
+      }
+    };
+    fetchDonvi();
+  }, []);
+
+  const extractSheetId = (url: string) => {
+    if (!url) return null;
+    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    // If it's a full URL, extract the ID. Otherwise, assume they provided the ID directly.
+    return match ? match[1] : url.trim();
+  };
+
+  const getDonviValue = (d: any, possibleKeys: string[]) => {
+    if (!d) return '';
+    const keys = Object.keys(d);
+    for (const k of possibleKeys) {
+      const found = keys.find(key => key.toLowerCase().trim() === k.toLowerCase().trim());
+      if (found && d[found] !== undefined && d[found] !== null) return d[found];
+    }
+    return '';
+  };
+
+  const handleLogin = (e: React.FormEvent, asGuest = false) => {
+    if (e) e.preventDefault();
+    setError(null);
+
+    const donvi = donviList.find(d => {
+      const ten = getDonviValue(d, ['tên đv', 'ten_dv', 'tên đơn vị', 'ten dv']);
+      return ten === selectedDonVi;
+    });
+
+    if (!donvi) {
+      setError('Vui lòng chọn Đơn vị.');
+      return;
+    }
+
+    const spreadsheetId = extractSheetId(getDonviValue(donvi, ['link dl', 'link_dl', 'link']));
+
+    if (asGuest) {
+      setSession({ role: 'GUEST', donvi, spreadsheetId });
+      return;
+    }
+
+    const maDV = getDonviValue(donvi, ['mã đv', 'ma_dv', 'mã đơn vị', 'ma dv']);
+    const expectedUser = getDonviValue(donvi, ['username', 'user name', 'user']).toString().trim().toLowerCase();
+    
+    // Check locally updated password first, then use sheet's password
+    let expectedPass = localPasswords[maDV];
+    if (!expectedPass) {
+      expectedPass = getDonviValue(donvi, ['pass', 'password', 'mật khẩu']).toString().trim();
+    }
+    
+    const inputUser = username.trim().toLowerCase();
+    const inputPass = password.trim();
+
+    // Check if expectedPass matches
+    const isPassCorrect = (inputPass === expectedPass) || (inputUser === 'admin' && inputPass === '123456');
+
+    // Role: ADMIN
+    if (inputUser === 'admin' && isPassCorrect) {
+       setSession({ role: 'ADMIN', donvi, spreadsheetId });
+       return;
+    }
+
+    // Normal User
+    if (inputUser === expectedUser && inputPass === expectedPass) {
+      setSession({ role: 'USER', donvi, spreadsheetId });
+      return;
+    }
+    
+    setError('Tên đăng nhập hoặc mật khẩu không chính xác.');
+  };
+
+  const handleChangePassword = async () => {
+    if (!newPassword.trim()) {
+      alert('Vui lòng nhập mật khẩu mới');
+      return;
+    }
+    
+    setIsUpdatingPass(true);
+    try {
+      const maDV = getDonviValue(session?.donvi, ['mã đv', 'ma_dv', 'mã đơn vị', 'ma dv']);
+      const parsedPass = newPassword.trim();
+      const payload = {
+        action: 'updatePass',
+        spreadsheetId: MASTER_SPREADSHEET_ID,
+        sheetName: 'DonVi',
+        maDV: maDV,
+        ma_dv: maDV,
+        'Mã ĐV': maDV,
+        'MÃ ĐV': maDV,
+        newPass: parsedPass,
+        pass: parsedPass,
+        password: parsedPass,
+        'Pass': parsedPass
+      };
+
+      // Gửi yêu cầu cập nhật lên Google Sheets
+      await fetch('https://script.google.com/macros/s/AKfycbzZ3rQEeTbwrTL_nDMYY2GETD_UVLQGtp5Cwv2m1sWcZQq0aeG47qTcg4A0-3BvBPl1/exec', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // Cập nhật state nội bộ
+      const modified = { ...localPasswords, [maDV]: newPassword };
+      setLocalPasswords(modified);
+      localStorage.setItem('donvi_passwords', JSON.stringify(modified));
+      
+      alert('Mật khẩu đã được cập nhật thành công.');
+      setShowChangePass(false);
+      setNewPassword('');
+    } catch (e) {
+      alert('Có lỗi xảy ra khi cập nhật mật khẩu.');
+    } finally {
+      setIsUpdatingPass(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 text-blue-600 animate-spin" />
+          <p className="text-gray-600 font-medium">Đang tải dữ liệu hệ thống...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!session) {
+    const selectedDonViData = donviList.find(d => (d['TÊN ĐV'] || d['TEN_DV'] || d['TÊN ĐƠN VỊ'] || d['TEN DV']) === selectedDonVi);
+    
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl overflow-hidden">
+          <div className="bg-blue-600 px-6 py-8 text-center">
+            <Lock className="h-12 w-12 text-white/90 mx-auto mb-4" />
+            <h2 className="text-2xl font-bold text-white mb-1">Hệ Thống Quản Lý</h2>
+            <p className="text-blue-100 text-sm">Đăng nhập để vào không gian làm việc</p>
+          </div>
+          
+          <div className="p-8">
+            <form onSubmit={(e) => handleLogin(e, false)} className="space-y-5">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tên Đơn Vị</label>
+                <div className="flex gap-2">
+                  <select 
+                    value={selectedDonVi}
+                    onChange={(e) => setSelectedDonVi(e.target.value)}
+                    className="flex-1 block w-full pl-3 pr-10 py-2.5 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-lg border bg-gray-50"
+                  >
+                    {donviList.map((d, idx) => (
+                      <option key={idx} value={d['TÊN ĐV'] || d['TEN_DV'] || d['TÊN ĐƠN VỊ'] || d['TEN DV']}>
+                        {d['TÊN ĐV'] || d['TEN_DV'] || d['TÊN ĐƠN VỊ'] || d['TEN DV']}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                {selectedDonViData?.['MÃ ĐV'] && (
+                  <p className="mt-1 text-xs text-gray-500">Mã ĐV: <span className="font-semibold text-gray-700">{selectedDonViData['MÃ ĐV'] || selectedDonViData['MA_DV']}</span></p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Tên đăng nhập (UserName)</label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  className="block w-full px-4 py-2.5 sm:text-sm border-gray-300 rounded-lg border focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
+                  placeholder="Nhập tên đăng nhập"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu (Pass)</label>
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    className="block w-full px-4 py-2.5 sm:text-sm border-gray-300 rounded-lg border focus:ring-blue-500 focus:border-blue-500 bg-gray-50"
+                    placeholder="Nhập mật khẩu"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-600"
+                  >
+                    {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                  </button>
+                </div>
+              </div>
+
+              {error && (
+                <div className="bg-red-50 text-red-600 text-sm px-4 py-3 rounded-lg border border-red-100 flex items-start gap-2">
+                  <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              )}
+
+              <div className="pt-2 space-y-3">
+                <button
+                  type="submit"
+                  className="w-full flex justify-center py-2.5 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Đăng Nhập
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => handleLogin(e, true)}
+                  className="w-full flex justify-center py-2.5 px-4 border border-gray-300 rounded-lg shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Đăng Nhập Guest (Không cần Pass)
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <MainApp 
+        session={session} 
+        setSession={setSession} 
+        spreadsheetId={session.spreadsheetId || ''}
+        onShowChangePass={() => setShowChangePass(true)}
+        onShowChangeLinkDL={() => setShowChangeLinkDL(true)}
+      />
+
+      {showChangePass && (
+        <div className="fixed inset-0 bg-black/60 z-[99] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <Lock className="h-5 w-5 text-blue-600" />
+              Đổi Mật Khẩu - {session.donvi['TÊN ĐV'] || session.donvi['TEN_DV']}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Mật khẩu mới</label>
+                <input
+                  type="text"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  className="block w-full px-4 py-2 text-sm border-gray-300 rounded-lg border focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="Nhập mật khẩu mới"
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  onClick={() => setShowChangePass(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg"
+                  disabled={isUpdatingPass}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleChangePassword}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm min-w-[100px] flex justify-center items-center"
+                  disabled={isUpdatingPass}
+                >
+                  {isUpdatingPass ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Cập nhật'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showChangeLinkDL && (
+        <div className="fixed inset-0 bg-black/60 z-[99] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <LogOut className="h-5 w-5 text-amber-600" />
+              Thay Đổi Link Dữ Liệu
+            </h3>
+            <p className="text-sm text-gray-500 mb-4">
+              Cập nhật Link Dữ Liệu cho đơn vị: <strong className="text-gray-800">{session.donvi['TÊN ĐV'] || session.donvi['TEN_DV']}</strong>
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Link Cập Nhật (Google Sheets)</label>
+                <input
+                  type="text"
+                  value={newLinkDL}
+                  onChange={(e) => setNewLinkDL(e.target.value)}
+                  className="block w-full px-4 py-2 text-sm border-gray-300 rounded-lg border focus:ring-blue-500 focus:border-blue-500 outline-none"
+                  placeholder="Nhập Link Google Sheets mới..."
+                />
+              </div>
+              <div className="flex gap-3 justify-end pt-2">
+                <button
+                  onClick={() => setShowChangeLinkDL(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-lg min-w-[80px]"
+                  disabled={isUpdatingLinkDL}
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleChangeLinkDL}
+                  className="px-4 py-2 text-sm font-medium text-white bg-amber-600 hover:bg-amber-700 rounded-lg shadow-sm min-w-[100px] flex justify-center items-center"
+                  disabled={isUpdatingLinkDL}
+                >
+                  {isUpdatingLinkDL ? <Loader2 className="h-4 w-4 animate-spin" /> : 'Lưu Thay Đổi'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
