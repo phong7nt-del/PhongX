@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { Loader2, AlertCircle, FileSpreadsheet, Users, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter, Map as MapIcon, Route, Eye, EyeOff, LogOut, Lock, Settings } from 'lucide-react';
+import { Loader2, AlertCircle, FileSpreadsheet, Users, User, Receipt, Search, Download, MapPin, Phone, MessageSquare, BarChart3, Star, Edit2, Check, X, ClipboardList, Filter, Map as MapIcon, Route, Eye, EyeOff, LogOut, Lock, Settings } from 'lucide-react';
 import { cn } from './lib/utils';
 import RouteOptimizer from './components/RouteOptimizer';
 
@@ -380,10 +380,11 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
         return;
       }
       
-      const TON_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Ton`;
-      const CHIANHOM_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=ChiaNhom`;
-      const KHUVUC_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=KhuVuc`;
-      const CAPNHATSDT_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=CapNhatSDT`;
+      const cacheBust = new Date().getTime();
+      const TON_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=Ton&_cb=${cacheBust}`;
+      const CHIANHOM_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=ChiaNhom&_cb=${cacheBust}`;
+      const KHUVUC_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=KhuVuc&_cb=${cacheBust}`;
+      const CAPNHATSDT_URL = `https://docs.google.com/spreadsheets/d/${spreadsheetId}/gviz/tq?tqx=out:csv&sheet=CapNhatSDT&_cb=${cacheBust}`;
 
       setLoading(true);
       setError(null);
@@ -1524,16 +1525,17 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
             </div>
             
             <div className="flex-shrink-0 px-2 sm:px-4 text-center">
-              <h1 className="text-base sm:text-xl md:text-2xl font-bold text-white tracking-tight drop-shadow-sm uppercase">Hệ Thống Quản Lý Tồn Nợ</h1>
+              <h1 className="text-base sm:text-xl md:text-2xl font-bold text-white tracking-tight drop-shadow-sm uppercase">Hệ Thống Quản Trị Nợ Tiền Điện</h1>
             </div>
 
             <div className="flex-1 hidden md:flex items-center justify-end gap-3">
               <div className="text-right mr-2">
-                <div className="text-white font-medium text-sm drop-shadow-sm">
-                  {session?.role === 'ADMIN' ? 'Admin' : session?.role === 'GUEST' ? 'Khách (Guest)' : 'Người Dùng'}
+                <div className="text-white font-medium text-sm drop-shadow-sm flex items-center gap-1.5 justify-end">
+                  <User className="w-4 h-4 opacity-80" />
+                  <span>{session?.role === 'ADMIN' ? 'Admin' : session?.role === 'GUEST' ? 'Khách (Guest)' : 'Người Dùng'}</span>
                 </div>
                 <div className="text-white/80 text-[10px] w-full text-right mt-0.5 truncate" title={session?.donvi?.['TÊN ĐV'] || session?.donvi?.['TEN_DV']}>
-                  Tài khoản
+                  {session?.donvi?.['TÊN ĐV'] || session?.donvi?.['TEN_DV']}
                 </div>
               </div>
 
@@ -2445,7 +2447,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
           <div className="flex flex-wrap justify-center gap-2 sm:gap-4 items-center font-medium">
             <span>Tác giả: Nguyễn Thành Phong - PCVT</span>
             <span className="opacity-50 hidden sm:inline">|</span>
-            <span className="font-mono text-xs opacity-80">Version 2026.4.1 (Mùa {seasonTheme.name})</span>
+            <span className="font-mono text-xs opacity-80">Version 2 (2026.06.01)</span>
           </div>
         </div>
       </footer>
@@ -2545,7 +2547,8 @@ export default function App() {
       setLoading(true);
       setError(null);
       try {
-        const DONVI_URL = `https://docs.google.com/spreadsheets/d/${MASTER_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=DonVi`;
+        const cacheBust = new Date().getTime();
+        const DONVI_URL = `https://docs.google.com/spreadsheets/d/${MASTER_SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=DonVi&_cb=${cacheBust}`;
         Papa.parse(DONVI_URL, {
           download: true,
           header: true,
@@ -2574,7 +2577,10 @@ export default function App() {
 
   const extractSheetId = (url: string) => {
     if (!url) return null;
-    const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    let match = url.match(/\/d\/e\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
+    }
     // If it's a full URL, extract the ID. Otherwise, assume they provided the ID directly.
     return match ? match[1] : url.trim();
   };
