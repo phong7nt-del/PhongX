@@ -361,9 +361,11 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
   const [phoneUpdateLog, setPhoneUpdateLog] = useState<any[]>([]);
   const [editingPhone, setEditingPhone] = useState<{ maKhang: string, currentPhone: string } | null>(null);
   const [newPhoneInput, setNewPhoneInput] = useState('');
+  const [showNewPhoneForm, setShowNewPhoneForm] = useState(false);
+  const [newPhoneFormData, setNewPhoneFormData] = useState({ nhom: '', maKhang: '', tenKhang: '', diaChi: '', sdtCu: '', sdtMoi: '' });
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
   const [statusUpdates, setStatusUpdates] = useState<Record<string, string>>({});
-  const [statusFilter, setStatusFilter] = useState<'Mới đề nghị' | 'Đã cập nhật'>('Mới đề nghị');
+  const [statusFilter, setStatusFilter] = useState<'Tất cả' | 'Mới đề nghị' | 'Đã cập nhật'>('Tất cả');
   const [showRouteOptimizer, setShowRouteOptimizer] = useState(false);
 
   const [currentFilteredDetails, setCurrentFilteredDetails] = useState<any[] | null>(null);
@@ -516,7 +518,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
       'Khác': []
     };
 
-    allUpdates.filter(u => u.TRANG_THAI === statusFilter).forEach(update => {
+    allUpdates.filter(u => statusFilter === 'Tất cả' || u.TRANG_THAI === statusFilter).forEach(update => {
       const region = nhomToKhuVuc.get(update.NHOM) || update.NHOM || 'Khác';
       const regionLower = region.toLowerCase();
       if (regionLower.includes('vũng tàu') || regionLower.includes('vung tau')) grouped['Vũng Tàu'].push(update);
@@ -1079,6 +1081,72 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
     XLSX.writeFile(wb, `${filename}.xlsx`);
   };
 
+  const handleNewPhoneSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newPhoneFormData.sdtMoi.trim() || !newPhoneFormData.maKhang.trim()) {
+      alert('Vui lòng nhập Mã Khách và SĐT Mới');
+      return;
+    }
+    
+    setIsUpdatingPhone(true);
+    try {
+      const today = new Date();
+      const formattedDate = `${today.getDate().toString().padStart(2, '0')}/${(today.getMonth() + 1).toString().padStart(2, '0')}/${today.getFullYear()}`;
+      
+      const payload = {
+        action: 'updatePhone',
+        spreadsheetId,
+        nhom: newPhoneFormData.nhom.trim(),
+        maKhang: newPhoneFormData.maKhang.trim(),
+        tenKhang: newPhoneFormData.tenKhang.trim(),
+        diaChi: newPhoneFormData.diaChi.trim(),
+        sdtCu: newPhoneFormData.sdtCu.trim() ? "'" + newPhoneFormData.sdtCu.trim() : "",
+        sdtMoi: newPhoneFormData.sdtMoi.trim() ? "'" + newPhoneFormData.sdtMoi.trim() : "",
+        thoiGian: formattedDate,
+        trangThai: 'Mới đề nghị'
+      };
+
+      const SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzZ3rQEeTbwrTL_nDMYY2GETD_UVLQGtp5Cwv2m1sWcZQq0aeG47qTcg4A0-3BvBPl1/exec';
+      await fetch(SCRIPT_URL, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      const newRecord = {
+        STT: capNhatSdtData.length + 1,
+        NHOM: payload.nhom,
+        MA_KHANG: payload.maKhang,
+        TEN_KHANG: payload.tenKhang,
+        DCHI_KHANG: payload.diaChi,
+        DTHOAI_CU: newPhoneFormData.sdtCu.trim(),
+        DTHOAI_MOI: newPhoneFormData.sdtMoi.trim(),
+        THOI_GIAN: payload.thoiGian,
+        TRANG_THAI: payload.trangThai
+      };
+
+      setCapNhatSdtData(prev => [...prev, newRecord]);
+      setUpdatedPhones(prev => ({ ...prev, [payload.maKhang]: newPhoneFormData.sdtMoi.trim() }));
+      
+      // Also update TON_NO data
+      setTonData(prevTon => prevTon.map(item => 
+        item.MA_KHANG === payload.maKhang ? { ...item, DTHOAI_DVU: newPhoneFormData.sdtMoi.trim() } : item
+      ));
+
+      alert('Đã gửi đề nghị thành công!');
+      setShowNewPhoneForm(false);
+      setNewPhoneFormData({ nhom: '', maKhang: '', tenKhang: '', diaChi: '', sdtCu: '', sdtMoi: '' });
+    } catch (error) {
+      console.error(error);
+      alert('Có lỗi xảy ra khi cập nhật SĐT. Vui lòng thử lại.');
+    } finally {
+      setIsUpdatingPhone(false);
+    }
+  };
+
   const handleUpdatePhone = async (row: any) => {
     if (!newPhoneInput.trim() || isUpdatingPhone) return;
     
@@ -1098,8 +1166,8 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
         maKhang: row.MA_KHANG || '',
         tenKhang: row.TEN_KHANG || '',
         diaChi: row.DCHI_KHANG || '',
-        sdtCu: currentPhone,
-        sdtMoi: newPhone,
+        sdtCu: currentPhone ? "'" + currentPhone : "",
+        sdtMoi: newPhone ? "'" + newPhone : "",
         thoiGian: formattedDate,
         trangThai: 'Mới đề nghị'
       };
@@ -1115,6 +1183,10 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
       });
 
       // Update local state
+      setStatusUpdates(prev => ({
+        ...prev,
+        [row.MA_KHANG]: 'Mới đề nghị'
+      }));
       setUpdatedPhones(prev => ({
         ...prev,
         [row.MA_KHANG]: newPhone
@@ -2322,16 +2394,67 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
             {/* Tab 5 Content */}
             {activeTab === 'tab5' && (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                {showNewPhoneForm && (
+                  <div className="bg-white p-6 rounded-xl shadow-sm border border-pink-200">
+                    <h3 className="text-lg font-bold text-gray-800 mb-4">Tạo đề nghị cập nhật SĐT mới</h3>
+                    <form onSubmit={handleNewPhoneSubmit} className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Mã Khách Hàng *</label>
+                          <input type="text" value={newPhoneFormData.maKhang} onChange={e => setNewPhoneFormData({...newPhoneFormData, maKhang: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500" required />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Tên Khách Hàng</label>
+                          <input type="text" value={newPhoneFormData.tenKhang} onChange={e => setNewPhoneFormData({...newPhoneFormData, tenKhang: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">SĐT Mới *</label>
+                          <input type="text" value={newPhoneFormData.sdtMoi} onChange={e => setNewPhoneFormData({...newPhoneFormData, sdtMoi: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500" required />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">SĐT Cũ</label>
+                          <input type="text" value={newPhoneFormData.sdtCu} onChange={e => setNewPhoneFormData({...newPhoneFormData, sdtCu: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Địa Chỉ</label>
+                          <input type="text" value={newPhoneFormData.diaChi} onChange={e => setNewPhoneFormData({...newPhoneFormData, diaChi: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500" />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Nhóm (TN/GC/N...)</label>
+                          <input type="text" value={newPhoneFormData.nhom} onChange={e => setNewPhoneFormData({...newPhoneFormData, nhom: e.target.value})} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-pink-500 focus:border-pink-500" />
+                        </div>
+                      </div>
+                      <div className="flex justify-end gap-3 mt-4">
+                        <button type="button" onClick={() => setShowNewPhoneForm(false)} className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg font-medium">Hủy</button>
+                        <button type="submit" disabled={isUpdatingPhone} className="px-4 py-2 text-white bg-pink-600 hover:bg-pink-700 rounded-lg font-medium disabled:opacity-50">
+                          {isUpdatingPhone ? 'Đang gửi...' : 'Gửi đề nghị'}
+                        </button>
+                      </div>
+                    </form>
+                  </div>
+                )}
+
                 <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-                  <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-                    <ClipboardList className="h-6 w-6 text-pink-600" />
-                    Thống kê danh sách đề nghị cập nhật SĐT
-                  </h2>
+                  <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                      <ClipboardList className="h-6 w-6 text-pink-600" />
+                      Thống kê danh sách đề nghị cập nhật SĐT
+                    </h2>
+                    <button
+                      onClick={() => setShowNewPhoneForm(!showNewPhoneForm)}
+                      className="px-4 py-2 bg-pink-50 text-pink-700 border border-pink-200 hover:bg-pink-100 rounded-lg font-medium text-sm transition-colors"
+                    >
+                      + Nhập mới đề nghị
+                    </button>
+                  </div>
                   
                   {/* Region Sub-tabs and Status Filter */}
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 mb-6 pb-2">
                     <div className="flex space-x-2 overflow-x-auto">
-                      {['Vũng Tàu', 'Bà Rịa', 'Phú Mỹ', 'Côn Đảo'].map(region => (
+                      {['Vũng Tàu', 'Bà Rịa', 'Phú Mỹ', 'Côn Đảo', 'Khác'].map(region => {
+                        const count = updatesByRegion[region]?.length || 0;
+                        if (region === 'Khác' && count === 0) return null;
+                        return (
                         <button
                           key={region}
                           onClick={() => setActiveRegionTab(region)}
@@ -2342,19 +2465,20 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                               : "border-transparent text-gray-500 hover:text-gray-700 hover:bg-gray-50"
                           )}
                         >
-                          Khu vực {region} ({updatesByRegion[region]?.length || 0})
+                          Khu vực {region} ({count})
                         </button>
-                      ))}
+                      )})}
                     </div>
                     
                     <div className="flex items-center gap-2">
-                      <label htmlFor="statusFilter" className="text-sm font-medium text-gray-700">Trạng thái:</label>
+                      <label htmlFor="statusFilter" className="text-sm font-medium text-gray-700 whitespace-nowrap">Trạng thái:</label>
                       <select
                         id="statusFilter"
                         value={statusFilter}
-                        onChange={(e) => setStatusFilter(e.target.value as 'Mới đề nghị' | 'Đã cập nhật')}
-                        className="block w-40 pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 rounded-lg border appearance-none bg-white"
+                        onChange={(e) => setStatusFilter(e.target.value as 'Tất cả' | 'Mới đề nghị' | 'Đã cập nhật')}
+                        className="block w-40 pl-3 pr-10 py-2 text-sm border-gray-300 focus:outline-none focus:ring-2 focus:ring-pink-500 focus:border-pink-500 rounded-lg border appearance-none bg-white font-medium text-gray-700"
                       >
+                        <option value="Tất cả">Tất cả</option>
                         <option value="Mới đề nghị">Mới đề nghị</option>
                         <option value="Đã cập nhật">Đã cập nhật</option>
                       </select>
