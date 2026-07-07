@@ -452,6 +452,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
       const nhom = row['NHÓM'] || row['NHOM'];
       if (nhom) groupSet.add(nhom);
     });
+    groupSet.add('Khác');
     return Array.from(groupSet).sort();
   }, [chiaNhomData]);
 
@@ -542,7 +543,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
     tonData.forEach(row => {
       const maKhang = row['MA_KHANG'];
       const tongNo = parseNumber(row['TONG_NO']);
-      const nhom = khangToNhom.get(maKhang) || 'Không xác định';
+      const nhom = khangToNhom.get(maKhang) || 'Khác';
       
       const nam = parseInt(row['NAM'] || row['Nam'] || row['nam'] || '0', 10);
       const thang = parseInt(row['THANG'] || row['Thang'] || row['thang'] || '0', 10);
@@ -674,7 +675,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
     }).map((row, index) => ({
       ...row,
       STT: index + 1,
-      NHOM: khangToNhom.get(row['MA_KHANG']) || 'Không xác định',
+      NHOM: khangToNhom.get(row['MA_KHANG']) || 'Khác',
       THANG_HD: row['THANG'] || row['Thang'] || row['thang'] || '',
       NAM_HD: row['NAM'] || row['Nam'] || row['nam'] || '',
       KY_HD: row['KY'] || row['Ky'] || row['ky'] || '',
@@ -701,7 +702,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
       const details = filteredTonData.map((row, index) => ({
         ...row,
         STT: index + 1,
-        NHOM: khangToNhom.get(row['MA_KHANG']) || 'Không xác định',
+        NHOM: khangToNhom.get(row['MA_KHANG']) || 'Khác',
         THANG_HD: row['THANG'] || row['Thang'] || row['thang'] || '',
         NAM_HD: row['NAM'] || row['Nam'] || row['nam'] || '',
         KY_HD: row['KY'] || row['Ky'] || row['ky'] || '',
@@ -719,7 +720,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
             ...row,
             SO_KY: 1,
             TONG_NO: parseNumber(row['TONG_NO']),
-            NHOM: khangToNhom.get(maKhang) || 'Không xác định',
+            NHOM: khangToNhom.get(maKhang) || 'Khác',
             DOANHSO: `${row['MA_KVUC'] || ''} - ${row['STT'] || ''}`
           });
         } else {
@@ -931,7 +932,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
 
     tonData.forEach(row => {
       const maKhang = row['MA_KHANG'];
-      const nhom = khangToNhom.get(maKhang);
+      const nhom = khangToNhom.get(maKhang) || 'Khác';
       const tongNo = parseNumber(row['TONG_NO']);
       
       if (nhom && summaryByGroup.has(nhom)) {
