@@ -364,6 +364,9 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
   const [showNewPhoneForm, setShowNewPhoneForm] = useState(false);
   const [newPhoneFormData, setNewPhoneFormData] = useState({ nhom: '', maKhang: '', tenKhang: '', diaChi: '', sdtCu: '', sdtMoi: '' });
   const [isUpdatingPhone, setIsUpdatingPhone] = useState(false);
+  const [editingGroup, setEditingGroup] = useState<{ maKhang: string, currentGroup: string } | null>(null);
+  const [newGroupInput, setNewGroupInput] = useState('');
+  const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
   const [statusUpdates, setStatusUpdates] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<'Tất cả' | 'Mới đề nghị' | 'Đã cập nhật'>('Tất cả');
   const [showRouteOptimizer, setShowRouteOptimizer] = useState(false);
@@ -1219,6 +1222,57 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
     }
   };
 
+  const handleUpdateGroup = async (row: any) => {
+    if (!newGroupInput.trim() || isUpdatingGroup || !editingGroup) return;
+    
+    setIsUpdatingGroup(true);
+    const newGroup = newGroupInput.trim();
+    
+    try {
+      const payload = {
+        action: 'updateGroup',
+        spreadsheetId,
+        maKhang: editingGroup.maKhang,
+        tenKhang: row.TEN_KHANG || '',
+        newGroup: newGroup
+      };
+
+      // Call Google Apps Script Web App
+      await fetch('https://script.google.com/macros/s/AKfycbzZ3rQEeTbwrTL_nDMYY2GETD_UVLQGtp5Cwv2m1sWcZQq0aeG47qTcg4A0-3BvBPl1/exec', {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: {
+          'Content-Type': 'text/plain',
+        },
+        body: JSON.stringify(payload)
+      });
+
+      // Update local state
+      setChiaNhomData(prev => {
+        const existingIndex = prev.findIndex(item => item.MA_KHANG === editingGroup.maKhang);
+        if (existingIndex !== -1) {
+          const newData = [...prev];
+          newData[existingIndex] = { ...newData[existingIndex], 'NHÓM': newGroup, 'NHOM': newGroup };
+          return newData;
+        } else {
+          return [...prev, { MA_KHANG: editingGroup.maKhang, 'NHÓM': newGroup, 'NHOM': newGroup, TEN_KHANG: row.TEN_KHANG }];
+        }
+      });
+      
+      if (currentFilteredDetails) {
+         setCurrentFilteredDetails(prev => prev ? prev.filter(item => item.MA_KHANG !== editingGroup.maKhang) : null);
+      }
+      
+      setEditingGroup(null);
+      setNewGroupInput('');
+    } catch (error) {
+      console.error('Error updating group:', error);
+      alert('Có lỗi xảy ra khi cập nhật nhóm. Vui lòng thử lại!');
+    } finally {
+      setIsUpdatingGroup(false);
+    }
+  };
+
   const handleUpdateStatus = async (update: any) => {
     try {
       const payload = {
@@ -1428,7 +1482,44 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
       { key: 'STT', label: 'STT', minWidth: 'w-[1%] whitespace-nowrap' },
       { key: 'DOANHSO', label: 'Doanh số', minWidth: 'w-[1%] whitespace-nowrap' },
       ...(showGroupColumn ? [{ key: 'NHOM', label: 'Nhóm' }] : []),
-      { key: 'MA_KHANG', label: 'Mã Khách', render: (row: any) => <span className="text-blue-600 font-medium">{row.MA_KHANG}</span> },
+      { key: 'MA_KHANG', label: 'Mã Khách', render: (row: any) => (
+        editingGroup?.maKhang === row.MA_KHANG ? (
+          <div className="flex items-center gap-1">
+            <select
+              value={newGroupInput}
+              onChange={(e) => setNewGroupInput(e.target.value)}
+              className="w-28 px-2 py-1 border border-blue-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500 text-xs text-gray-700 bg-white"
+            >
+              <option value="" disabled>Chọn nhóm...</option>
+              {groups.filter(g => g !== 'Khác').map(g => (
+                <option key={g} value={g}>{g}</option>
+              ))}
+            </select>
+            <button onClick={() => handleUpdateGroup(row)} disabled={isUpdatingGroup} className="p-1 text-green-600 hover:bg-green-50 rounded">
+              {isUpdatingGroup ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+            </button>
+            <button onClick={() => setEditingGroup(null)} disabled={isUpdatingGroup} className="p-1 text-red-600 hover:bg-red-50 rounded">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-blue-600 font-medium">{row.MA_KHANG}</span>
+            {row.NHOM === 'Khác' && (
+              <button
+                onClick={() => {
+                  setEditingGroup({ maKhang: row.MA_KHANG, currentGroup: row.NHOM });
+                  setNewGroupInput('');
+                }}
+                className="text-blue-500 hover:bg-blue-50 rounded transition-colors p-1"
+                title="Cập nhật nhóm"
+              >
+                <Edit2 className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        )
+      )},
       { key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' },
       { key: 'SO_KY', label: 'Số Kỳ', align: 'right', minWidth: 'w-[1%] whitespace-nowrap' },
       { key: 'TONG_NO', label: 'Tổng Nợ', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_NO)}</span> },

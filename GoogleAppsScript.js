@@ -69,6 +69,43 @@ function doPost(e) {
       }
     }
     
+    if (action === "updateGroup") {
+      var sheet = ss.getSheetByName('ChiaNhom');
+      if(!sheet) {
+        return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "Sheet ChiaNhom not found" })).setMimeType(ContentService.MimeType.JSON);
+      }
+      
+      var values = sheet.getDataRange().getValues();
+      var headers = values[0];
+      var maKhangCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "ma_khang" || h.toString().toLowerCase() === "mã khách hàng" || h.toString().toLowerCase() === "mã khách");
+      if (maKhangCol === -1) maKhangCol = 0; // default to col A
+      
+      var nhomCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "nhóm" || h.toString().toLowerCase() === "nhom" || h.toString().toLowerCase() === "tên nhóm");
+      if(nhomCol === -1) nhomCol = 2; // default to col C
+      
+      var updated = false;
+      for(var i = 1; i < values.length; i++){
+        if(values[i][maKhangCol] && values[i][maKhangCol].toString().trim() === data.maKhang.toString().trim()){
+          sheet.getRange(i+1, nhomCol+1).setValue(data.newGroup);
+          updated = true;
+          break;
+        }
+      }
+      
+      if (!updated) {
+        var newRow = new Array(headers.length).fill("");
+        newRow[maKhangCol] = data.maKhang;
+        newRow[nhomCol] = data.newGroup;
+        
+        var tenKhangCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "tên khách hàng" || h.toString().toLowerCase() === "ten_khang");
+        if (tenKhangCol !== -1 && data.tenKhang) newRow[tenKhangCol] = data.tenKhang;
+        
+        sheet.appendRow(newRow);
+      }
+      
+      return ContentService.createTextOutput(JSON.stringify({ "status": "success", "message": "Updated Group" })).setMimeType(ContentService.MimeType.JSON);
+    }
+
     if (action === "updateLinkDL") {
       var sheet = ss.getSheetByName(sheetName);
       if(!sheet) return ContentService.createTextOutput("Sheet not found");
