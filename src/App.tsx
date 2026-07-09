@@ -42,6 +42,8 @@ function FilterableTable({ data, columns, keyExtractor, footerRow, showFilter = 
   const [openFilter, setOpenFilter] = useState<string | null>(null);
   const [showMobileFilters, setShowMobileFilters] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: string, direction: 'asc' | 'desc' } | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const pageSize = 100;
 
   useEffect(() => {
     const handleClickOutside = () => setOpenFilter(null);
@@ -93,6 +95,14 @@ function FilterableTable({ data, columns, keyExtractor, footerRow, showFilter = 
 
     return result;
   }, [data, filters, sortConfig]);
+
+  // Reset page when filters or data change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredData.length]);
+
+  const totalPages = Math.ceil(filteredData.length / pageSize);
+  const paginatedData = useMemo(() => filteredData.slice((currentPage - 1) * pageSize, currentPage * pageSize), [filteredData, currentPage, pageSize]);
 
   const onDataChangeRef = React.useRef(onDataChange);
   useEffect(() => {
@@ -232,14 +242,14 @@ function FilterableTable({ data, columns, keyExtractor, footerRow, showFilter = 
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {filteredData.length === 0 ? (
+            {paginatedData.length === 0 ? (
               <tr>
                 <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
                   Không tìm thấy dữ liệu phù hợp.
                 </td>
               </tr>
             ) : (
-              filteredData.map((row, idx) => (
+              paginatedData.map((row, idx) => (
                 <tr key={keyExtractor ? keyExtractor(row, idx) : idx} className="hover:bg-blue-50/50 transition-colors">
                   {columns.map(col => (
                     <td 
@@ -277,6 +287,23 @@ function FilterableTable({ data, columns, keyExtractor, footerRow, showFilter = 
           )}
         </table>
       </div>
+      
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4">
+           <div className="text-sm text-gray-700">
+             Hiển thị <span className="font-medium">{(currentPage - 1) * pageSize + 1}</span> đến <span className="font-medium">{Math.min(currentPage * pageSize, filteredData.length)}</span> trong số <span className="font-medium">{filteredData.length}</span> kết quả
+           </div>
+           <div className="flex items-center gap-2">
+             <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+               Trước
+             </button>
+             <span className="text-sm text-gray-700 font-medium">Trang {currentPage} / {totalPages}</span>
+             <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
+               Sau
+             </button>
+           </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -367,6 +394,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
   const [editingGroup, setEditingGroup] = useState<{ maKhang: string, currentGroup: string } | null>(null);
   const [newGroupInput, setNewGroupInput] = useState('');
   const [isUpdatingGroup, setIsUpdatingGroup] = useState(false);
+  const [isAutoAssigning, setIsAutoAssigning] = useState(false);
   const [statusUpdates, setStatusUpdates] = useState<Record<string, string>>({});
   const [statusFilter, setStatusFilter] = useState<'Tất cả' | 'Mới đề nghị' | 'Đã cập nhật'>('Tất cả');
   const [showRouteOptimizer, setShowRouteOptimizer] = useState(false);
@@ -465,8 +493,21 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
     chiaNhomData.forEach(row => {
       const maKhang = row['MA_KHANG'];
       const nhom = row['NHÓM'] || row['NHOM'];
-      if (maKhang && nhom) {
-        map.set(maKhang, nhom);
+      if (maKhang !== undefined && maKhang !== null && nhom) {
+        map.set(maKhang.toString().trim(), nhom);
+      }
+    });
+    return map;
+  }, [chiaNhomData]);
+
+  // Map MA_SOGCS to Nhom
+  const sogcsToNhom = useMemo(() => {
+    const map = new Map<string, string>();
+    chiaNhomData.forEach(row => {
+      const sogcs = (row['MA_SOGCS'] || row['Ma_SoGCS'] || row['MÃ SỔ GCS'] || '').toString().toLowerCase().replace(/\s/g, '');
+      const nhom = row['NHÓM'] || row['NHOM'];
+      if (sogcs && nhom && nhom !== 'Khác') {
+        map.set(sogcs, nhom);
       }
     });
     return map;
@@ -536,7 +577,8 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
   }, [allUpdates, nhomToKhuVuc, statusFilter]);
 
   // Aggregate ALL data by Ma_Khang first
-  const allAggregatedData = useMemo(() => {
+  // Aggregate base data by Ma_Khang, independently of NHOM
+  const baseAggregatedData = useMemo(() => {
     const aggregated = new Map<string, any>();
     
     const currentDate = new Date();
@@ -544,9 +586,9 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
     const currentMonth = currentDate.getMonth() + 1; // 1-12
 
     tonData.forEach(row => {
-      const maKhang = row['MA_KHANG'];
+      const maKhangRaw = row['MA_KHANG'];
+      const maKhang = maKhangRaw !== undefined && maKhangRaw !== null ? maKhangRaw.toString().trim() : '';
       const tongNo = parseNumber(row['TONG_NO']);
-      const nhom = khangToNhom.get(maKhang) || 'Khác';
       
       const nam = parseInt(row['NAM'] || row['Nam'] || row['nam'] || '0', 10);
       const thang = parseInt(row['THANG'] || row['Thang'] || row['thang'] || '0', 10);
@@ -583,7 +625,6 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
         aggregated.set(maKhang, {
           MA_KVUC: row['MA_KVUC'] || '',
           STT_TON: row['STT'] || '',
-          NHOM: nhom,
           MA_KHANG: maKhang,
           TEN_KHANG: row['TEN_KHANG'] || '',
           SO_KY: 1,
@@ -604,7 +645,15 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
       }
     });
     return Array.from(aggregated.values());
-  }, [tonData, khangToNhom]);
+  }, [tonData]);
+
+  // Apply NHOM mapping
+  const allAggregatedData = useMemo(() => {
+    return baseAggregatedData.map(item => ({
+      ...item,
+      NHOM: (item.MA_KHANG && khangToNhom.get(item.MA_KHANG)) || 'Khác'
+    }));
+  }, [baseAggregatedData, khangToNhom]);
 
   // Process data for Tab 1 (Selected Group)
   const tab1Data = useMemo(() => {
@@ -1230,11 +1279,16 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
     
     try {
       const payload = {
-        action: 'updateGroup',
+        action: 'updateGroupBatch',
         spreadsheetId,
-        maKhang: editingGroup.maKhang,
-        tenKhang: row.TEN_KHANG || '',
-        newGroup: newGroup
+        updates: [{
+          maKhang: editingGroup.maKhang,
+          tenKhang: row.TEN_KHANG || '',
+          maSoGcs: row.MA_SOGCS || '',
+          danhSo: row.DOANHSO || '',
+          diaChi: row.DCHI_KHANG || '',
+          newGroup: newGroup
+        }]
       };
 
       // Call Google Apps Script Web App
@@ -1249,14 +1303,18 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
 
       // Update local state
       setChiaNhomData(prev => {
-        const existingIndex = prev.findIndex(item => item.MA_KHANG === editingGroup.maKhang);
-        if (existingIndex !== -1) {
-          const newData = [...prev];
-          newData[existingIndex] = { ...newData[existingIndex], 'NHÓM': newGroup, 'NHOM': newGroup };
-          return newData;
+        const newData = [...prev];
+        const index = newData.findIndex(item => 
+          item.MA_KHANG !== undefined && 
+          item.MA_KHANG !== null && 
+          item.MA_KHANG.toString().trim() === editingGroup.maKhang.toString().trim()
+        );
+        if (index !== -1) {
+          newData[index] = { ...newData[index], 'NHÓM': newGroup, 'NHOM': newGroup };
         } else {
-          return [...prev, { MA_KHANG: editingGroup.maKhang, 'NHÓM': newGroup, 'NHOM': newGroup, TEN_KHANG: row.TEN_KHANG }];
+          newData.push({ MA_KHANG: editingGroup.maKhang, 'NHÓM': newGroup, 'NHOM': newGroup, TEN_KHANG: row.TEN_KHANG });
         }
+        return newData;
       });
       
       if (currentFilteredDetails) {
@@ -1270,6 +1328,96 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
       alert('Có lỗi xảy ra khi cập nhật nhóm. Vui lòng thử lại!');
     } finally {
       setIsUpdatingGroup(false);
+    }
+  };
+
+  const handleAutoAssignGroup = async () => {
+    if (!tab1Data || !tab1Data.details || isAutoAssigning) return;
+    
+    setIsAutoAssigning(true);
+    try {
+      const updates: any[] = [];
+      const assignedMaKhangs = new Set<string>();
+
+      tab1Data.details.forEach((row: any) => {
+        const maKhang = row.MA_KHANG;
+        const sogcs = (row.MA_SOGCS || '').toString().toLowerCase().replace(/\s/g, '');
+        if (sogcs && sogcsToNhom.has(sogcs)) {
+          const nhom = sogcsToNhom.get(sogcs);
+          if (nhom && nhom !== 'Khác') {
+            updates.push({
+              maKhang: maKhang,
+              newGroup: nhom,
+              tenKhang: row.TEN_KHANG || '',
+              maSoGcs: row.MA_SOGCS || '',
+              danhSo: row.DOANHSO || '',
+              diaChi: row.DCHI_KHANG || ''
+            });
+            assignedMaKhangs.add(maKhang);
+          }
+        }
+      });
+
+      if (updates.length === 0) {
+        alert('Không tìm thấy khách hàng nào có Mã Sổ GCS khớp với các nhóm hiện tại.');
+        setIsAutoAssigning(false);
+        return;
+      }
+
+      const chunkSize = 1000;
+      for (let i = 0; i < updates.length; i += chunkSize) {
+        const chunk = updates.slice(i, i + chunkSize);
+        const payload = {
+          action: 'updateGroupBatch',
+          spreadsheetId,
+          updates: chunk
+        };
+
+        await fetch('https://script.google.com/macros/s/AKfycbzZ3rQEeTbwrTL_nDMYY2GETD_UVLQGtp5Cwv2m1sWcZQq0aeG47qTcg4A0-3BvBPl1/exec', {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: {
+            'Content-Type': 'text/plain',
+          },
+          body: JSON.stringify(payload)
+        });
+      }
+
+      // Update local state
+      setChiaNhomData(prev => {
+        const newData = [...prev];
+        const maKhangToIndex = new Map<string, number>();
+        newData.forEach((item, index) => {
+          if (item.MA_KHANG !== undefined && item.MA_KHANG !== null) {
+            maKhangToIndex.set(item.MA_KHANG.toString().trim(), index);
+          }
+        });
+
+        updates.forEach(update => {
+          const mk = update.maKhang !== undefined && update.maKhang !== null ? update.maKhang.toString().trim() : '';
+          if (maKhangToIndex.has(mk)) {
+            const idx = maKhangToIndex.get(mk)!;
+            newData[idx] = { ...newData[idx], 'NHÓM': update.newGroup, 'NHOM': update.newGroup };
+          } else {
+            newData.push({ MA_KHANG: update.maKhang, 'NHÓM': update.newGroup, 'NHOM': update.newGroup, TEN_KHANG: update.tenKhang });
+            maKhangToIndex.set(mk, newData.length - 1);
+          }
+        });
+        return newData;
+      });
+
+      if (currentFilteredDetails) {
+        setCurrentFilteredDetails(prev => prev ? prev.filter(item => !assignedMaKhangs.has(item.MA_KHANG)) : null);
+      }
+
+      setTimeout(() => {
+        alert(`Đã phân công tự động thành công ${updates.length} khách hàng!`);
+      }, 100);
+    } catch (error) {
+      console.error('Error auto assigning group:', error);
+      alert('Có lỗi xảy ra khi phân công tự động. Vui lòng thử lại!');
+    } finally {
+      setIsAutoAssigning(false);
     }
   };
 
@@ -1369,10 +1517,10 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                 if (e.key === 'Escape') setEditingPhone(null);
               }}
             />
-            <button onClick={() => handleUpdatePhone(row)} className="p-1 text-green-600 hover:bg-green-50 rounded">
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpdatePhone(row); }} className="p-1 text-green-600 hover:bg-green-50 rounded">
               <Check className="h-4 w-4" />
             </button>
-            <button onClick={() => setEditingPhone(null)} className="p-1 text-red-600 hover:bg-red-50 rounded">
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingPhone(null); }} className="p-1 text-red-600 hover:bg-red-50 rounded">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -1443,10 +1591,10 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                 placeholder="Nhập SĐT mới"
                 autoFocus
               />
-              <button onClick={() => handleUpdatePhone(row)} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
+              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpdatePhone(row); }} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
                 <Check className="h-4 w-4" />
               </button>
-              <button onClick={() => setEditingPhone(null)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingPhone(null); }} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1495,10 +1643,20 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                 <option key={g} value={g}>{g}</option>
               ))}
             </select>
-            <button onClick={() => handleUpdateGroup(row)} disabled={isUpdatingGroup} className="p-1 text-green-600 hover:bg-green-50 rounded">
+            <button 
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpdateGroup(row); }} 
+              disabled={isUpdatingGroup} 
+              className="p-1 text-green-600 hover:bg-green-50 rounded"
+            >
               {isUpdatingGroup ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
             </button>
-            <button onClick={() => setEditingGroup(null)} disabled={isUpdatingGroup} className="p-1 text-red-600 hover:bg-red-50 rounded">
+            <button 
+              type="button"
+              onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingGroup(null); }} 
+              disabled={isUpdatingGroup} 
+              className="p-1 text-red-600 hover:bg-red-50 rounded"
+            >
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -1507,7 +1665,10 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
             <span className="text-blue-600 font-medium">{row.MA_KHANG}</span>
             {row.NHOM === 'Khác' && (
               <button
-                onClick={() => {
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
                   setEditingGroup({ maKhang: row.MA_KHANG, currentGroup: row.NHOM });
                   setNewGroupInput('');
                 }}
@@ -1538,10 +1699,10 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                 if (e.key === 'Escape') setEditingPhone(null);
               }}
             />
-            <button onClick={() => handleUpdatePhone(row)} className="p-1 text-green-600 hover:bg-green-50 rounded">
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpdatePhone(row); }} className="p-1 text-green-600 hover:bg-green-50 rounded">
               <Check className="h-4 w-4" />
             </button>
-            <button onClick={() => setEditingPhone(null)} className="p-1 text-red-600 hover:bg-red-50 rounded">
+            <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingPhone(null); }} className="p-1 text-red-600 hover:bg-red-50 rounded">
               <X className="h-4 w-4" />
             </button>
           </div>
@@ -1625,10 +1786,10 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                 placeholder="Nhập SĐT mới"
                 autoFocus
               />
-              <button onClick={() => handleUpdatePhone(row)} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
+              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleUpdatePhone(row); }} className="p-2 text-white bg-green-600 hover:bg-green-700 rounded-lg">
                 <Check className="h-4 w-4" />
               </button>
-              <button onClick={() => setEditingPhone(null)} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
+              <button type="button" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setEditingPhone(null); }} className="p-2 text-gray-600 bg-gray-100 hover:bg-gray-200 rounded-lg">
                 <X className="h-4 w-4" />
               </button>
             </div>
@@ -1927,6 +2088,17 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                           </span>
                         </div>
                         <div className="flex items-center gap-2">
+                          {selectedGroup === 'Khác' && (
+                            <button
+                              onClick={handleAutoAssignGroup}
+                              disabled={isAutoAssigning}
+                              className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 rounded-lg transition-colors border border-transparent shadow-sm"
+                              title="Tự động phân công các khách hàng có Sổ GCS khớp với nhóm hiện tại"
+                            >
+                              {isAutoAssigning ? <Loader2 className="h-4 w-4 animate-spin" /> : <ClipboardList className="h-4 w-4" />}
+                              Phân công tự động
+                            </button>
+                          )}
                           <button
                             onClick={() => setShowRouteOptimizer(true)}
                             className="inline-flex items-center gap-2 px-3 py-1.5 text-sm font-medium text-white bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-sm rounded-lg transition-colors border border-transparent"
