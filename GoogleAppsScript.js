@@ -4,19 +4,28 @@
 // 3. Sao chép và dán toàn bộ đoạn code dưới đây thay thế cho code cũ
 // 4. Bấm "Triển khai" (Deploy) > "Quản lý bản triển khai" > Chỉnh sửa bản hiện tại chọn "Phiên bản mới" (New version).
 
+function getColLetter(col) {
+  var letter = "";
+  while (col > 0) {
+    var temp = (col - 1) % 26;
+    letter = String.fromCharCode(temp + 65) + letter;
+    col = (col - temp - 1) / 26;
+  }
+  return letter;
+}
+
 function doPost(e) {
   try {
     var data = JSON.parse(e.postData.contents);
     var action = data.action;
     var spreadsheetId = data.spreadsheetId;
-    var sheetName = data.sheetName || 'CapNhatSDT'; // Default for updatePhone
+    var sheetName = data.sheetName || 'CapNhatSDT';
     
     var ss = SpreadsheetApp.openById(spreadsheetId);
     
     if (action === "updatePhone") {
       var sheet = ss.getSheetByName(sheetName);
       if (!sheet) {
-        // Create sheet if not exists
         sheet = ss.insertSheet(sheetName);
         sheet.appendRow(["STT", "Nhóm", "Ma_Khang", "Ten_Khang", "DCHI_KHANG", "DTHOAI_DVU CU", "DTHOAI_DVU MOI", "TGian_CAPNHAT", "Trạng Thái"]);
       }
@@ -49,10 +58,10 @@ function doPost(e) {
       var lastCol = sheet.getLastColumn();
       var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
       
-      var maKhangCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "ma_khang" || h.toString().toLowerCase() === "mã khách hàng" || h.toString().toLowerCase() === "mã khách");
+      var maKhangCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "ma_khang" || h.toString().toLowerCase() === "mã khách hàng" || h.toString().toLowerCase() === "mã khách" });
       if (maKhangCol === -1) maKhangCol = 2; // Default to col C (0-indexed 2)
       
-      var trangThaiCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "trạng thái" || h.toString().toLowerCase() === "trang_thai");
+      var trangThaiCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "trạng thái" || h.toString().toLowerCase() === "trang_thai" });
       if(trangThaiCol === -1) trangThaiCol = 8; // Default to col I (0-indexed 8)
       
       var updated = false;
@@ -92,24 +101,24 @@ function doPost(e) {
         headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
       }
       
-      var sttCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "stt");
-      var maKhangCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "ma_khang" || h.toString().toLowerCase() === "mã khách hàng" || h.toString().toLowerCase() === "mã khách");
+      var sttCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "stt" });
+      var maKhangCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "ma_khang" || h.toString().toLowerCase() === "mã khách hàng" || h.toString().toLowerCase() === "mã khách" });
       if (maKhangCol === -1) maKhangCol = 1;
       
-      var nhomCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "nhóm" || h.toString().toLowerCase() === "nhom" || h.toString().toLowerCase() === "tên nhóm");
+      var nhomCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "nhóm" || h.toString().toLowerCase() === "nhom" || h.toString().toLowerCase() === "tên nhóm" });
       if(nhomCol === -1) nhomCol = 3;
       
-      var tenKhangCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "tên khách hàng" || h.toString().toLowerCase() === "ten_khang" || h.toString().toLowerCase() === "tên khách");
-      var maSoGcsCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "mã sổ gcs" || h.toString().toLowerCase() === "ma_sogcs");
-      var danhSoCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "doanh số" || h.toString().toLowerCase() === "danhso" || h.toString().toLowerCase() === "doanh so");
-      var diaChiCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "địa chỉ" || h.toString().toLowerCase() === "dchi_khang" || h.toString().toLowerCase() === "dia chi");
+      var tenKhangCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "tên khách hàng" || h.toString().toLowerCase() === "ten_khang" || h.toString().toLowerCase() === "tên khách" });
+      var maSoGcsCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "mã sổ gcs" || h.toString().toLowerCase() === "ma_sogcs" });
+      var danhSoCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "doanh số" || h.toString().toLowerCase() === "danhso" || h.toString().toLowerCase() === "doanh so" });
+      var diaChiCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "địa chỉ" || h.toString().toLowerCase() === "dchi_khang" || h.toString().toLowerCase() === "dia chi" });
 
       var updates = action === "updateGroupBatch" ? data.updates : [data];
       var updatedCount = 0;
       var rowsToAppend = [];
       
       if (lastRow > 1) {
-        // Tối ưu hóa: Chỉ đọc cột MA_KHANG thay vì toàn bộ bảng (tránh quá tải bộ nhớ và timeout với 300k rows)
+        // Tối ưu hóa: Chỉ đọc cột MA_KHANG
         var maKhangData = sheet.getRange(2, maKhangCol + 1, lastRow - 1, 1).getValues();
         var maKhangToIndex = {};
         for(var i = 0; i < maKhangData.length; i++) {
@@ -144,15 +153,28 @@ function doPost(e) {
           }
         }
         
-        var rowsToUpdate = Object.keys(updatesByRow).map(Number).sort(function(a, b){return a-b});
+        var rowsToUpdate = Object.keys(updatesByRow).map(Number);
         if (rowsToUpdate.length > 0) {
-           // Đọc nguyên cột Nhóm và chỉ update các dòng thay đổi trên memory, sau đó ghi đè lại cột Nhóm
-           var nhomData = sheet.getRange(2, nhomCol + 1, lastRow - 1, 1).getValues();
+           var groups = {};
            for (var r = 0; r < rowsToUpdate.length; r++) {
               var rowIndex = rowsToUpdate[r];
-              nhomData[rowIndex - 2][0] = updatesByRow[rowIndex];
+              var groupVal = updatesByRow[rowIndex];
+              if (!groups[groupVal]) groups[groupVal] = [];
+              groups[groupVal].push(rowIndex);
            }
-           sheet.getRange(2, nhomCol + 1, lastRow - 1, 1).setValues(nhomData);
+           
+           var nColLetter = getColLetter(nhomCol + 1);
+           
+           for (var g in groups) {
+              var rowIndices = groups[g];
+              // Split into chunks of 400 to avoid RangeList limit
+              var maxRanges = 400;
+              for (var idx = 0; idx < rowIndices.length; idx += maxRanges) {
+                 var chunk = rowIndices.slice(idx, idx + maxRanges);
+                 var ranges = chunk.map(function(rIndex) { return nColLetter + rIndex; });
+                 sheet.getRangeList(ranges).setValue(g);
+              }
+           }
         }
       } else {
         for (var j = 0; j < updates.length; j++) {
@@ -180,6 +202,7 @@ function doPost(e) {
       return ContentService.createTextOutput(JSON.stringify({ "status": "success", "message": "Updated " + updatedCount + " groups" })).setMimeType(ContentService.MimeType.JSON);
     }
     
+    // ... [Omitted updateLinkDL and updatePass for brevity, wait I should include them to keep the file complete]
     if (action === "updateLinkDL") {
       var sheet = ss.getSheetByName(sheetName);
       if(!sheet) return ContentService.createTextOutput("Sheet not found");
@@ -189,11 +212,11 @@ function doPost(e) {
       if (lastRow <= 1) return ContentService.createTextOutput("Sheet is empty");
       
       var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-      var maDVCol = headers.findIndex(h => h.toString().toLowerCase().trim() === data.maDV.toString().toLowerCase().trim() || h.toString().toLowerCase() === "mã đv" || h.toString().toLowerCase() === "ma_dv");
-      if (maDVCol === -1) maDVCol = 1; // Default to col B
+      var maDVCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === data.maDV.toString().toLowerCase().trim() || h.toString().toLowerCase() === "mã đv" || h.toString().toLowerCase() === "ma_dv" });
+      if (maDVCol === -1) maDVCol = 1;
       
-      var linkDLCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "link dl" || h.toString().toLowerCase() === "link_dl");
-      if(linkDLCol === -1) linkDLCol = 3; // Default to col D
+      var linkDLCol = headers.findIndex(function(h) { return h.toString().toLowerCase().trim() === "link dl" || h.toString().toLowerCase() === "link_dl" });
+      if(linkDLCol === -1) linkDLCol = 3;
       
       var maDVData = sheet.getRange(2, maDVCol + 1, lastRow - 1, 1).getValues();
       for(var i = 0; i < maDVData.length; i++){
@@ -207,27 +230,47 @@ function doPost(e) {
     
     if (action === "updatePass") {
       var sheet = ss.getSheetByName(sheetName);
-      if(!sheet) return ContentService.createTextOutput("Sheet not found");
+      if(!sheet) return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "Sheet not found: " + sheetName })).setMimeType(ContentService.MimeType.JSON);
       
       var lastRow = sheet.getLastRow();
       var lastCol = sheet.getLastColumn();
-      if (lastRow <= 1) return ContentService.createTextOutput("Sheet is empty");
+      if (lastRow <= 1) return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "Sheet is empty" })).setMimeType(ContentService.MimeType.JSON);
       
       var headers = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
-      var maDVCol = headers.findIndex(h => h.toString().toLowerCase().trim() === data.maDV.toString().toLowerCase().trim() || h.toString().toLowerCase() === "mã đv");
-      if (maDVCol === -1) maDVCol = 1; 
       
-      var passCol = headers.findIndex(h => h.toString().toLowerCase().trim() === "pass" || h.toString().toLowerCase() === "mật khẩu");
-      if(passCol === -1) passCol = 5; 
+      // Target key to match: nhom or maDV
+      var targetKey = (data.nhom || data.maDV || data.username || "").toString().replace(/\s+/g, "").toLowerCase();
       
-      var maDVData = sheet.getRange(2, maDVCol + 1, lastRow - 1, 1).getValues();
-      for(var i = 0; i < maDVData.length; i++){
-        if(maDVData[i][0] && maDVData[i][0].toString().toLowerCase() === data.maDV.toLowerCase()){
-          sheet.getRange(i+2, passCol+1).setValue(data.newPass);
+      var keyCol = headers.findIndex(function(h) { 
+        var str = h.toString().toLowerCase().trim();
+        return str === "nhóm" || str === "nhom" || str === "tên nhóm" || str === "mã đv" || str === "ma_dv" || str === "mã đơn vị";
+      });
+      if (keyCol === -1) keyCol = 1; 
+      
+      var passCol = headers.findIndex(function(h) { 
+        var str = h.toString().toLowerCase().trim();
+        return str === "matkhau" || str === "mật khẩu" || str === "mat_khau" || str === "pass" || str === "password";
+      });
+      if(passCol === -1) {
+        passCol = (sheetName && sheetName.toLowerCase() === "khuvuc") ? 3 : 5;
+      }
+      
+      var colData = sheet.getRange(2, keyCol + 1, lastRow - 1, 1).getValues();
+      var updated = false;
+      for(var i = 0; i < colData.length; i++){
+        var cellVal = colData[i][0] ? colData[i][0].toString().replace(/\s+/g, "").toLowerCase() : "";
+        if(cellVal === targetKey){
+          sheet.getRange(i + 2, passCol + 1).setValue(data.newPass);
+          updated = true;
           break;
         }
       }
-      return ContentService.createTextOutput(JSON.stringify({ "status": "success", "message": "Updated Pass" })).setMimeType(ContentService.MimeType.JSON);
+      
+      if (updated) {
+        return ContentService.createTextOutput(JSON.stringify({ "status": "success", "message": "Updated Pass" })).setMimeType(ContentService.MimeType.JSON);
+      } else {
+        return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "Record not found: " + targetKey })).setMimeType(ContentService.MimeType.JSON);
+      }
     }
     
     return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": "Unknown action" })).setMimeType(ContentService.MimeType.JSON);
