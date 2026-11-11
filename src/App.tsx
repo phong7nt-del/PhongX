@@ -366,7 +366,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
   const [selectedGroupTab3, setSelectedGroupTab3] = useState<string>(session?.userGroup || '');
   const [soKyMinFilter, setSoKyMinFilter] = useState<string>('2');
   const [activeRegionTab, setActiveRegionTab] = useState<string>('Vũng Tàu');
-  const [showNamePhone, setShowNamePhone] = useState(false);
+  const [showCustomerInfo, setShowCustomerInfo] = useState(false);
   
   // Tab 4 Search State
   const [activeTab4SubTab, setActiveTab4SubTab] = useState<'timKiem' | 'locTheoPhien' | 'locTheoKyHD'>('timKiem');
@@ -1698,10 +1698,10 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
           </div>
         )
       )},
-      ...(showNamePhone ? [{ key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' }] : []),
+      ...(showCustomerInfo ? [{ key: 'TEN_KHANG', label: 'Tên Khách', minWidth: 'min-w-[200px]' }] : []),
       { key: 'SO_KY', label: 'Số Kỳ', align: 'right', minWidth: 'w-[1%] whitespace-nowrap' },
       { key: 'TONG_NO', label: 'Tổng Nợ', align: 'right', render: (row: any) => <span className="font-semibold text-red-600">{formatCurrency(row.TONG_NO)}</span> },
-      ...(showNamePhone ? [{ key: 'DTHOAI_DVU', label: 'Điện Thoại', render: (row: any) => (
+      ...(showCustomerInfo ? [{ key: 'DTHOAI_DVU', label: 'Điện Thoại', render: (row: any) => (
         editingPhone?.maKhang === row.MA_KHANG ? (
           <div className="flex items-center gap-1">
             <input
@@ -1737,7 +1737,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
       )} ] : []),
       { key: 'MA_SOGCS', label: 'Mã Sổ GCS', minWidth: 'w-[1%] whitespace-nowrap' },
       { key: 'SO_TBI', label: 'Số TBI' },
-      { key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[250px]', render: (row: any) => (
+      ...(showCustomerInfo ? [{ key: 'DCHI_KHANG', label: 'Địa Chỉ', minWidth: 'min-w-[250px]', render: (row: any) => (
         <div className="flex items-start gap-2">
           {row.DCHI_KHANG && (
             <a 
@@ -1752,7 +1752,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
           )}
           <span>{row.DCHI_KHANG}</span>
         </div>
-      )},
+      )} ] : []),
       { key: 'TU_THANG', label: 'Từ tháng', align: 'right', minWidth: 'w-[1%] whitespace-nowrap', render: (row: any) => (
         <span className="text-gray-500 whitespace-nowrap text-xs">{row.SO_KY > 1 && row.MIN_THANG ? row.MIN_THANG : '-'}</span>
       ) },
@@ -1773,7 +1773,7 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
           <div>
             <div className="text-xs text-gray-500 mb-1">STT: {row.STT} {showGroupColumn && `• Nhóm: ${row.NHOM}`}</div>
             <div className="font-bold text-blue-600 text-lg">{row.MA_KHANG}</div>
-            {showNamePhone && <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>}
+            {showCustomerInfo && <div className="font-medium text-gray-900">{row.TEN_KHANG}</div>}
           </div>
           <div className="text-right">
             <div className="font-bold text-red-600 text-lg">{formatCurrency(row.TONG_NO)}</div>
@@ -1787,12 +1787,14 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
           <div className="col-span-2"><span className="text-gray-400">Số TBI:</span> {row.SO_TBI}</div>
         </div>
 
-        <div className="text-sm text-gray-700 mb-4 flex items-start gap-2">
-          <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
-          <span>{row.DCHI_KHANG}</span>
-        </div>
+        {showCustomerInfo && row.DCHI_KHANG && (
+          <div className="text-sm text-gray-700 mb-4 flex items-start gap-2">
+            <MapPin className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+            <span>{row.DCHI_KHANG}</span>
+          </div>
+        )}
 
-        {showNamePhone && (
+        {showCustomerInfo && (
           <div className="border-t border-gray-100 pt-3">
             {editingPhone?.maKhang === row.MA_KHANG ? (
               <div className="flex items-center gap-2">
@@ -2134,17 +2136,17 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                         </div>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setShowNamePhone(prev => !prev)}
+                            onClick={() => setShowCustomerInfo(prev => !prev)}
                             className={cn(
                               "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border shadow-sm",
-                              showNamePhone 
+                              showCustomerInfo 
                                 ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" 
                                 : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                             )}
-                            title={showNamePhone ? "Ẩn cột Tên khách và Điện thoại" : "Hiện cột Tên khách và Điện thoại"}
+                            title={showCustomerInfo ? "Ẩn cột Tên khách, Điện thoại và Địa chỉ" : "Hiện cột Tên khách, Điện thoại và Địa chỉ"}
                           >
-                            {showNamePhone ? <EyeOff className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-gray-500" />}
-                            <span>{showNamePhone ? "Ẩn Tên & SĐT" : "Hiện Tên & SĐT"}</span>
+                            {showCustomerInfo ? <EyeOff className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-gray-500" />}
+                            <span>{showCustomerInfo ? "Ẩn Tên, SĐT, Đ/C" : "Hiện Tên, SĐT, Đ/C"}</span>
                           </button>
                           {selectedGroup === 'Khác' && (
                             <button
@@ -2551,17 +2553,17 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                               </div>
                               <div className="flex items-center gap-2">
                                 <button
-                                  onClick={() => setShowNamePhone(prev => !prev)}
+                                  onClick={() => setShowCustomerInfo(prev => !prev)}
                                   className={cn(
                                     "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border shadow-sm",
-                                    showNamePhone 
+                                    showCustomerInfo 
                                       ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" 
                                       : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                                   )}
-                                  title={showNamePhone ? "Ẩn cột Tên khách và Điện thoại" : "Hiện cột Tên khách và Điện thoại"}
+                                  title={showCustomerInfo ? "Ẩn cột Tên khách, Điện thoại và Địa chỉ" : "Hiện cột Tên khách, Điện thoại và Địa chỉ"}
                                 >
-                                  {showNamePhone ? <EyeOff className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-gray-500" />}
-                                  <span>{showNamePhone ? "Ẩn Tên & SĐT" : "Hiện Tên & SĐT"}</span>
+                                  {showCustomerInfo ? <EyeOff className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-gray-500" />}
+                                  <span>{showCustomerInfo ? "Ẩn Tên, SĐT, Đ/C" : "Hiện Tên, SĐT, Đ/C"}</span>
                                 </button>
                                 <button
                                   onClick={() => handleExportExcel(tab4KyHDData.details, `LocTheoKyHD_${selectedGroupTab4KyHD}`)}
@@ -2715,17 +2717,17 @@ function MainApp({ session, setSession, spreadsheetId, onShowChangePass, onShowC
                         </div>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => setShowNamePhone(prev => !prev)}
+                            onClick={() => setShowCustomerInfo(prev => !prev)}
                             className={cn(
                               "inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-colors border shadow-sm",
-                              showNamePhone 
+                              showCustomerInfo 
                                 ? "bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100" 
                                 : "bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100"
                             )}
-                            title={showNamePhone ? "Ẩn cột Tên khách và Điện thoại" : "Hiện cột Tên khách và Điện thoại"}
+                            title={showCustomerInfo ? "Ẩn cột Tên khách, Điện thoại và Địa chỉ" : "Hiện cột Tên khách, Điện thoại và Địa chỉ"}
                           >
-                            {showNamePhone ? <EyeOff className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-gray-500" />}
-                            <span>{showNamePhone ? "Ẩn Tên & SĐT" : "Hiện Tên & SĐT"}</span>
+                            {showCustomerInfo ? <EyeOff className="h-4 w-4 text-blue-600" /> : <Eye className="h-4 w-4 text-gray-500" />}
+                            <span>{showCustomerInfo ? "Ẩn Tên, SĐT, Đ/C" : "Hiện Tên, SĐT, Đ/C"}</span>
                           </button>
                           <button
                             onClick={() => handleExportExcel(currentTab3Data.details, activeTab3SubTab === 'lonHon5M' ? `KhachHangTren5Trieu_${selectedGroupTab3}` : activeTab3SubTab === 'noKhoDoi' ? `KhachHangNoKhoDoi_${selectedGroupTab3}` : `KhachHangNoNhieuKy_${selectedGroupTab3}`)}
